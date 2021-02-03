@@ -67,6 +67,11 @@ int main(int argc, char* argv[])
     ::_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
+#ifdef WIN32
+    // To force the windows console to use UTF-8 code page.
+    ::SetConsoleOutputCP(CP_UTF8);
+#endif
+
     using namespace JUtils;
 
     // Set print precision
