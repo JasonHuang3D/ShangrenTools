@@ -17,7 +17,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Can be used by target_link_libraries(XXX PRIVATE build_settings) for a specific target
 add_library(build_settings INTERFACE)
 if (MSVC)
-    target_compile_options(build_settings INTERFACE /W4 /WX /wd4100 /wd4189 /wd4324)
+    target_compile_options(build_settings INTERFACE /W4 /WX /wd4100 /wd4189 /wd4324 /utf-8)
     # In all release modes also:
     # - disable w4189 - local variable is initialized but not referenced
     # - Enable whole program optimization (/GL)
