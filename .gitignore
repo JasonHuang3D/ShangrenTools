@@ -1,0 +1,9 @@
+build/
+bin/
+
+.DS_Store
+.vscode/
+*.txt.user
+CMakeLists.txt.user*
+*.pyc
+test.cmd

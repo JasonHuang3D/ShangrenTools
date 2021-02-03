@@ -1,0 +1,24 @@
+---
+BasedOnStyle: Microsoft
+Standard: Cpp11
+
+# The following options override those from the Microsoft style.
+AccessModifierOffset: -4
+AlignAfterOpenBracket: DontAlign
+AlignConsecutiveAssignments: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AlignOperands: false
+AllowShortFunctionsOnASingleLine : Inline
+AlwaysBreakBeforeMultilineStrings: true
+AlwaysBreakTemplateDeclarations: Yes
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterUnion: true
+
+BreakConstructorInitializers: AfterColon
+ColumnLimit: 100
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+Cpp11BracedListStyle: false
+PointerBindsToType: true
+SpaceBeforeCpp11BracedList: true
+...
