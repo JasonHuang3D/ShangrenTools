@@ -19,7 +19,7 @@ bool UserDataList::ReadFromFile(
 {
     // Init out list
     outList.m_unitScale = uintScale;
-    auto& list = outList.m_list;
+    auto& list          = outList.m_list;
     list.clear();
 
     std::ifstream file(fileName);
@@ -42,9 +42,9 @@ bool UserDataList::ReadFromFile(
             // Make sure we have desc and data
             if (args.size() >= 2)
             {
-                auto desc = args[0].c_str();
+                auto desc  = args[0].c_str();
                 auto fData = std::stof(args[1]) * outList.m_unitScale;
-                auto data = static_cast<std::uint64_t>(fData);
+                auto data  = static_cast<std::uint64_t>(fData);
 
                 list.emplace_back(desc, data);
             }
@@ -59,5 +59,16 @@ bool UserDataList::ReadFromFile(
     }
 
     return false;
+}
+
+bool ResultData::isFinished() const
+{
+    if (m_combination.empty())
+        return false;
+
+    if (m_difference == 0)
+        return !m_isExceeded;
+    else
+        return m_isExceeded;
 }
 } // namespace JUtils

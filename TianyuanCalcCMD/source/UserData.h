@@ -10,14 +10,37 @@ namespace JUtils
 {
 struct UnitScale
 {
-    static constexpr std::uint64_t k10K  = 10000;
-    static constexpr std::uint64_t k100M = 100000000;
-
-    static constexpr char* GetUnitStr(std::uint64_t value)
+    enum Values : std::uint64_t
     {
-        if (value == k10K) return u8"万";
-        else if (value == k100M) return u8"亿";
-        return "";
+        k_10K  = 10000,
+        k_100M = 100000000
+    };
+
+    template <typename T>
+    static constexpr char* GetUnitStr(T value)
+    {
+        switch (value)
+        {
+        case k_10K:
+            return u8"万";
+        case k_100M:
+            return u8"亿";
+        default:
+            return "";
+        }
+    }
+
+    template <typename T>
+    static constexpr bool IsValid(T value)
+    {
+        switch (value)
+        {
+        case k_10K:
+        case k_100M:
+            return true;
+        default:
+            return false;
+        }
     }
 };
 
@@ -67,11 +90,11 @@ public:
     UserDataList(const UserDataList&) = delete;
     UserDataList& operator=(const UserDataList&) = delete;
 
-    std::vector<UserData>& GetList() { return m_list; }
+    const std::vector<UserData>& GetList() const { return m_list; }
     std::uint64_t GetUnitScale() const { return m_unitScale; };
 
 private:
-    std::uint64_t m_unitScale = UnitScale::k10K;
+    std::uint64_t m_unitScale = UnitScale::k_10K;
     std::vector<UserData> m_list;
 };
 
@@ -86,6 +109,8 @@ struct ResultData
     // Disable copy
     ResultData(const ResultData&) = delete;
     ResultData& operator=(const ResultData&) = delete;
+
+    bool isFinished() const;
 
 public:
     const UserData* m_pTarget = nullptr;
@@ -105,8 +130,9 @@ struct ResultDataList
     ResultDataList& operator=(const ResultDataList&) = delete;
 
 public:
-    std::uint64_t m_unitScale = UnitScale::k10K;
+    std::uint64_t m_unitScale = UnitScale::k_10K;
     std::vector<ResultData> m_list;
+    std::vector<const UserData*> m_remainInputs;
 
     std::uint64_t m_combiSum  = 0;
     std::uint64_t m_exeedSum  = 0;

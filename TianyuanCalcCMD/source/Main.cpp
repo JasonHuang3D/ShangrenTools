@@ -4,9 +4,12 @@
 
 #include "pch.h"
 
-#include "Calculator.h"
 #include "UserData.h"
 #include "Utils.h"
+
+#define MAX_COMBO_SIZE_BITS 6
+#define MAX_FRACTION_DIGITS_TO_PRINT 2
+#include "Calculator.h"
 
 #include <iomanip>
 
@@ -15,6 +18,9 @@
 #include <crtdbg.h>
 #endif // (WIN32) && defined (M_DEBUG)
 
+using namespace JUtils;
+namespace
+{
 enum class AppState : std::uint8_t
 {
     Idle = 0,
@@ -32,6 +38,15 @@ void PrintSmallSpace()
     std::cout << "-----------------------------------------" << std::endl;
 }
 
+void PrintInputData(std::uint32_t printIndex, const UserData* pUserData, std::uint64_t unitScale)
+{
+    if (!pUserData)
+        return;
+
+    std::cout << u8"仙人" << printIndex << ": " << pUserData->GetDesc() << u8", 战力:"
+              << FormatIntToFloat<double>(pUserData->GetData(), unitScale)
+              << UnitScale::GetUnitStr(unitScale) << std::endl;
+}
 AppState GetCurrentState()
 {
     char input;
@@ -57,11 +72,12 @@ AppState GetCurrentState()
 
     return outState;
 }
-
-AppState g_state = AppState::Idle;
+} // namespace
 
 int main(int argc, char* argv[])
 {
+    AppState appState = AppState::Idle;
+
 #if defined(WIN32) && defined(M_DEBUG)
     // Detecting memory leaks using CRT dbg
     ::_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -72,19 +88,17 @@ int main(int argc, char* argv[])
     ::SetConsoleOutputCP(CP_UTF8);
 #endif
 
-    using namespace JUtils;
-
     // Set print precision
     std::cout << std::fixed;
-    std::cout << std::setprecision(4);
+    std::cout << std::setprecision(MAX_FRACTION_DIGITS_TO_PRINT);
 
     Calculator calculator;
 
-    while (g_state != AppState::Exit)
+    while (appState != AppState::Exit)
     {
-        g_state = GetCurrentState();
+        appState = GetCurrentState();
 
-        switch (g_state)
+        switch (appState)
         {
         case AppState::Idle:
             std::cout << u8"等待输入正确命令..." << std::endl;
@@ -93,13 +107,16 @@ int main(int argc, char* argv[])
         {
             std::cout << u8"开始计算..." << std::endl;
 
+            // Init calculator
+            calculator.Init(UnitScale::k_10K);
+
             // Load user data
-            if (!calculator.LoadInputData("inputData.txt", UnitScale::k10K))
+            if (!calculator.LoadInputData("inputData.txt"))
             {
                 std::cout << u8"加载inputData.txt错误, 请检查文件及其内容!" << std::endl;
                 break;
             }
-            if (!calculator.LoadTargetData("targetData.txt", UnitScale::k10K))
+            if (!calculator.LoadTargetData("targetData.txt"))
             {
                 std::cout << u8"加载targetData.txt错误, 请检查文件及其内容!" << std::endl;
                 break;
@@ -108,7 +125,7 @@ int main(int argc, char* argv[])
             // Run
             ResultDataList resultList;
             std::string errorStr;
-            if (calculator.Run(resultList, errorStr))
+            if (calculator.Run(resultList, errorStr, Calculator::Solution::BestOfEachTarget))
             {
                 // Print the results
                 auto unitStr = UnitScale::GetUnitStr(resultList.m_unitScale);
@@ -132,10 +149,7 @@ int main(int argc, char* argv[])
                     for (int j = 0; j < combination.size(); ++j)
                     {
                         auto& userData = combination[j];
-                        std::cout << u8"仙人" << j + 1 << ": " << userData->GetDesc() << u8", 战力:"
-                                  << FormatIntToFloat<double>(
-                                         userData->GetData(), resultList.m_unitScale)
-                                  << unitStr << std::endl;
+                        PrintInputData(j + 1, userData, resultList.m_unitScale);
                     }
                     PrintSmallSpace();
 
@@ -155,6 +169,9 @@ int main(int argc, char* argv[])
                     PrintLargeSpace();
                 }
 
+                std::cout << u8"统计:" << std::endl;
+                PrintSmallSpace();
+
                 std::cout << u8"战力总计: "
                           << FormatIntToFloat<double>(resultList.m_combiSum, resultList.m_unitScale)
                           << unitStr << std::endl;
@@ -165,11 +182,28 @@ int main(int argc, char* argv[])
                           << FormatIntToFloat<double>(
                                  resultList.m_remainSum, resultList.m_unitScale)
                           << unitStr << std::endl;
+
+                std::cout << u8"剩余仙人: " << std::endl;
+                auto& remainInputs = resultList.m_remainInputs;
+                if (remainInputs.empty())
+                {
+                    std::cout << u8"无" << std::endl;
+                }
+                else
+                {
+                    for (int i = 0; i < remainInputs.size(); ++i)
+                    {
+                        auto& userData = remainInputs[i];
+                        PrintInputData(i + 1, userData, resultList.m_unitScale);
+                    }
+                }
+
                 PrintLargeSpace();
             }
             else
             {
-                std::cout << errorStr;
+                std::cout << u8"计算有误, 请将截图和数据发给开发者, 谢谢." << std::endl;
+                std::cout << errorStr << std::endl;
                 break;
             }
 

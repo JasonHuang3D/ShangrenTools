@@ -7,23 +7,42 @@
 
 #include <string>
 
+
+#ifndef MAX_COMBO_SIZE_BITS
+#define MAX_COMBO_SIZE_BITS 6
+#endif // !MAX_COMBO_SIZE_BITS
+
 namespace JUtils
 {
 
 class Calculator
 {
 public:
+    enum class Solution
+    {
+        BestOfEachTarget= 0,
+        OverallBest,
+
+        Test
+    };
+
+
     Calculator() {};
 
-    bool LoadInputData(const char* fileName, std::uint64_t unitScale);
-    bool LoadTargetData(const char* fileName, std::uint64_t unitScale);
+    bool Init(UnitScale::Values unitScale);
 
-    bool Run(ResultDataList& resultList, std::string& errorStr);
+    bool LoadInputData(const char* fileName);
+    bool LoadTargetData(const char* fileName);
+
+    bool Run(ResultDataList& resultList, std::string& errorStr, Solution solution);
 
 private:
+    bool loadUserData(const char* fileName, UserDataList& dataList);
 
     UserDataList m_inputDataVec;
     UserDataList m_targetDataList;
+
+    std::uint64_t m_unitScale = UnitScale::k_10K;
 };
 
 } // namespace JUtils

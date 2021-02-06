@@ -5,17 +5,20 @@
 #include "pch.h"
 
 #include "Calculator.h"
+#include "Utils.h"
 
 #include <cmath>
 #include <execution>
 #include <functional>
 #include <list>
-#include <set>
+#include <unordered_set>
 
 namespace
 {
 using namespace JUtils;
 
+namespace Algorithms
+{
 std::vector<ResultData> FindAllSumToTarget(
     const std::vector<const UserData*>& inputDataList, const UserData* pTarget)
 {
@@ -66,13 +69,15 @@ std::vector<ResultData> FindAllSumToTarget(
     return outResults;
 }
 
-void FindClosestSumToTarget(const std::vector<const UserData*>& inputDataList,
-    const UserData* pTarget, ResultData& outResult, bool forceGreaterEq = false)
+// Time Complexity O(N), TODO: check the algorithm carefully. Currently it produce wrong result
+// depends on input order.
+void FindClosestSumToTargetON(const std::vector<const UserData*>& inputVec, const UserData* pTarget,
+    ResultData& outResult, bool forceGreaterEq = false)
 {
     assert(pTarget);
 
     auto targetValue = pTarget->GetData();
-    int inputSize    = static_cast<int>(inputDataList.size());
+    int inputSize    = static_cast<int>(inputVec.size());
 
     struct WindowResult
     {
@@ -103,7 +108,8 @@ void FindClosestSumToTarget(const std::vector<const UserData*>& inputDataList,
     while (leftIndex <= rightIndex && rightIndex < inputSize)
     {
         // Add last element
-        currentSum += inputDataList[rightIndex]->GetData();
+        auto& inputData = inputVec[rightIndex];
+        currentSum += inputData->GetData();
 
         // When the current sum exceeds target value
         if (targetValue < currentSum)
@@ -134,8 +140,7 @@ void FindClosestSumToTarget(const std::vector<const UserData*>& inputDataList,
                 // In next iteration, left index increases
                 // but right index remains the same
                 // Update currentSum and leftIndex accordingly
-                auto toSub =
-                    inputDataList[leftIndex]->GetData() + inputDataList[rightIndex]->GetData();
+                auto toSub = inputVec[leftIndex]->GetData() + inputVec[rightIndex]->GetData();
                 assert(currentSum >= toSub);
                 currentSum -= toSub;
 
@@ -192,7 +197,7 @@ void FindClosestSumToTarget(const std::vector<const UserData*>& inputDataList,
     outResult.m_sum = 0;
     for (int i = startIndex; i <= endIndex && inputSize > 0; ++i)
     {
-        auto& data = inputDataList[i];
+        auto& data = inputVec[i];
         outResult.m_sum += data->GetData();
         outResult.m_combination.emplace_back(data);
     }
@@ -220,116 +225,300 @@ void FindClosestSumToTarget(const std::vector<const UserData*>& inputDataList,
     }
 }
 
-} // namespace
+struct Combination
+{
+    // 2 ^ 6 = 64 values.
+    static constexpr std::uint32_t k_bitsIndexToRemove = MAX_COMBO_SIZE_BITS;
 
-namespace JUtils
+    // To be the same as index of input to handle max size of combination.
+    static constexpr std::uint32_t k_bitsListSize = k_bitsIndexToRemove;
+
+    // The rest of int, we use it to store the index of comb list.
+    static constexpr std::uint32_t k_bitsAllCombSize = 32 - k_bitsIndexToRemove - k_bitsListSize;
+
+    Combination() :
+        parentCombIndex(GetInvalidValue(k_bitsAllCombSize)),
+        indexToRemove(GetInvalidValue(k_bitsIndexToRemove)),
+        listSize(0),
+        remainValue(0.0f),
+        hash(0) {};
+
+    Combination(float remainValue, std::uint32_t parentCombIndex, std::uint32_t indexToRemove,
+        std::uint32_t listSize, std::size_t hash) :
+        remainValue(0.0f),
+        parentCombIndex(GetInvalidValue(k_bitsAllCombSize)),
+        indexToRemove(GetInvalidValue(k_bitsIndexToRemove)),
+        listSize(0),
+        hash(0) {};
+
+    float remainValue = 0.0f;
+
+    std::uint32_t parentCombIndex : k_bitsAllCombSize;
+
+    std::uint32_t indexToRemove : k_bitsIndexToRemove;
+    std::uint32_t listSize : k_bitsListSize;
+
+    std::size_t hash = 0;
+};
+// Make sure we use expected size of combination
+static_assert(
+    sizeof(Combination) == sizeof(float) + 1 * sizeof(std::uint32_t) + sizeof(std::size_t));
+
+// Back tracking approach
+bool FindClosestSumToTargetBackTracking(const std::vector<const UserData*>& inputVec,
+    const UserData* pTarget, ResultData& outResult, std::string& errorStr,
+    std::uint64_t unitScale = 1, bool getAllComb = false)
 {
-bool JUtils::Calculator::LoadInputData(const char* fileName, std::uint64_t unitScale)
-{
-    return UserDataList::ReadFromFile(fileName, UnitScale::k10K, m_inputDataVec);
+    assert(pTarget);
+
+    auto targetValue = pTarget->GetData();
+    auto inputSize   = static_cast<std::uint32_t>(inputVec.size());
+
+    // Use our own copy for sorting the input values.
+    auto orderedInputVec = inputVec;
+    std::sort(std::execution::par, orderedInputVec.begin(), orderedInputVec.end(),
+        [&](const UserData* a, const UserData* b) -> bool { return *a > *b; });
+
+    // Init optimized inputData
+    std::vector<float> optimizedInputDataVec;
+    optimizedInputDataVec.reserve(inputSize);
+    for (auto& input : orderedInputVec)
+    {
+        auto dInput = static_cast<double>(input->GetData());
+
+        optimizedInputDataVec.emplace_back(static_cast<float>(dInput / unitScale));
+    }
+    // Init optimized target data
+    auto optimizedTargetData = static_cast<float>(static_cast<double>(targetValue) / unitScale);
+
+    // Calculate the total sum of every input.
+    std::vector<Combination> combinations;
+
+    // Helper function to compute the hash of a combination
+    auto getCombHash = [&](const Combination& comb) -> std::size_t {
+        size_t hash       = 0;
+        auto* currentComb = &comb;
+        for (std::uint32_t i = 0; i < comb.listSize; ++i)
+        {
+
+            HashCombine(hash, optimizedInputDataVec[currentComb->indexToRemove]);
+
+            auto nextIndex = currentComb->parentCombIndex;
+            if (nextIndex != GetInvalidValue(Combination::k_bitsAllCombSize))
+                currentComb = &combinations[nextIndex];
+            else
+                break;
+        }
+
+        return hash;
+    };
+    // This set is used for store hash values of each comb.
+    std::unordered_set<std::size_t> combTable;
+
+    auto& init = combinations.emplace_back();
+    for (auto& inputData : optimizedInputDataVec)
+    {
+        init.remainValue += inputData;
+    }
+    auto totalValue = init.remainValue;
+
+    // Add the init hash
+    combTable.insert(getCombHash(init));
+
+    // Init result by copying the init combination.
+    Combination opt = combinations.front();
+
+    // Loop over all input data
+    for (std::uint32_t i = 0; i < inputSize; ++i)
+    {
+        auto combSize  = combinations.size();
+        auto inputData = optimizedInputDataVec[i];
+
+        auto currentCombSize = combSize;
+        // Keep tracking previous combinations.
+        for (std::uint32_t j = 0; j < combSize; ++j)
+        {
+            // Keep substracting until the result is still larger than the target.
+            auto& comb = combinations[j];
+
+            // Combine previous hash of comb with current input data to filter duplicated combs
+            auto currentHash = comb.hash;
+            HashCombine(currentHash, inputData);
+            auto exist = combTable.find(currentHash) != combTable.end();
+            if (exist)
+                continue;
+
+            auto listSize = comb.listSize;
+            auto diff     = comb.remainValue - inputData;
+
+            // Our gloal is to find the subset that is closest and also greater equal to the target.
+            if (diff >= optimizedTargetData)
+            {
+                // If the data is too large throw an error.
+                if (currentCombSize + 1 >= GetInvalidValue(Combination::k_bitsAllCombSize))
+                {
+                    errorStr += "Size of input is too large, try to use fewer inputs!\n";
+                    return false;
+                }
+
+                // Combine the previous result with current index as another new result.
+                auto& newComb       = combinations.emplace_back();
+                newComb.remainValue = diff;
+
+                newComb.parentCombIndex = j;
+                newComb.indexToRemove   = i;
+
+                newComb.listSize = listSize + 1;
+
+                // Use current hash
+                newComb.hash = currentHash;
+                combTable.insert(newComb.hash);
+
+                ++currentCombSize;
+
+                // Get the optimal result
+                if (newComb.remainValue < opt.remainValue)
+                {
+                    opt = newComb;
+                }
+            }
+        }
+    }
+
+#ifdef M_DEBUG
+    std::cout << "Size of combs: " << combinations.size() << std::endl;
+#endif // M_DEBUG
+
+    // After get the opt, we config the result.
+    outResult.m_pTarget = pTarget;
+    outResult.m_sum     = 0;
+
+    // Get the indices to remove vec. the remove vec will store all indices in descending order
+    std::vector<std::uint32_t> indicesToRemove(opt.listSize);
+    {
+        Combination* currentComb = &opt;
+        for (std::uint32_t i = 0; i < opt.listSize; ++i)
+        {
+            assert(currentComb->indexToRemove != GetInvalidValue(Combination::k_bitsIndexToRemove));
+
+            indicesToRemove[i] = currentComb->indexToRemove;
+
+            auto nextIndex = currentComb->parentCombIndex;
+            if (nextIndex != GetInvalidValue(Combination::k_bitsAllCombSize))
+                currentComb = &combinations[nextIndex];
+            else
+                break;
+        }
+    }
+
+    for (std::uint32_t i = 0; i < inputSize; ++i)
+    {
+        // We skip the indices in opt, and the rest indices is the answer, binary search is valid
+        // here as it stores preivious indices in descending order.
+        if (std::binary_search(indicesToRemove.begin(), indicesToRemove.end(), i, std::greater()))
+            continue;
+
+        auto& data = orderedInputVec[i];
+        outResult.m_sum += data->GetData();
+
+        outResult.m_combination.emplace_back(data);
+    }
+
+    outResult.m_difference = outResult.m_sum >= targetValue ? outResult.m_sum - targetValue
+                                                            : targetValue - outResult.m_sum;
+    outResult.m_isExceeded = outResult.m_sum > targetValue;
+
+    return true;
 }
 
-bool Calculator::LoadTargetData(const char* fileName, std::uint64_t unitScale)
+// Dynamic programming approach.
+void FindClosestSumToTargetDP(const std::vector<const UserData*>& inputVec, const UserData* pTarget,
+    ResultData& outResult, bool getAllComb = false)
 {
-    return UserDataList::ReadFromFile(fileName, UnitScale::k10K, m_targetDataList);
+    assert(false);
+    // TODO: It seems like the best we could do is using dp table along with back tracking to get
+    // sums. So we will not benefit a lot from this approach.
+
+    assert(pTarget);
 }
 
-bool Calculator::Run(ResultDataList& resultList, std::string& errorStr)
+} // namespace Algorithms
+
+namespace Solutions
 {
-    // Init result list
+bool SolutionBestOfEachTarget(ResultDataList& resultList, std::string& errorStr,
+    const std::vector<const UserData*>& inputVec, const std::vector<const UserData*>& targetVec)
+{
     auto& resultVec = resultList.m_list;
-    resultVec.clear();
-    resultList.m_unitScale = m_inputDataVec.GetUnitScale();
-
-    if (m_inputDataVec.GetUnitScale() != m_targetDataList.GetUnitScale())
-    {
-        errorStr += " Unit scale of both target and input lists are not the same\n";
-        return false;
-    }
-
-    // Init input vector of pointers, avoid extra copies
-    std::vector<const UserData*> inputVec;
-    inputVec.reserve(m_inputDataVec.GetList().size());
-    for (auto& data : m_inputDataVec.GetList())
-        inputVec.emplace_back(&data);
-
-    // Sort inputVec inorder to use binary search
-    {
-        // Use pointer to compare the addresses, as input data might be the same
-        std::sort(std::execution::par, inputVec.begin(), inputVec.end(),
-            [](const UserData* a, const UserData* b) -> bool { return a < b; });
-    }
-
-    // Init target lists of pointers
-    std::vector<const UserData*> targetVec;
-    targetVec.reserve(m_targetDataList.GetList().size());
-    for (auto& data : m_targetDataList.GetList())
-        targetVec.emplace_back(&data);
-
     auto targetSize = targetVec.size();
 
-#if 0
-        {
-            static constexpr auto testLen = 1;
-            std::vector<UserData> testVec;
-            for (int i = 1; i <= testLen; ++i)
-            {
-                testVec.emplace_back(std::to_wstring(i).c_str(), i * 0);
-            }
+    // Make a copy
+    auto currentInputVec = inputVec;
 
-            std::vector<const UserData*> testPVec;
-            for (auto& data : testVec)
-                testPVec.emplace_back(&data);
-
-            UserData testTarget(L"Test Target", 0);
-
-            SumResults testResult;
-            FindClosestSumToTarget(testPVec, &testTarget, testResult);
-        }
-#endif // 0
-
-    // Get best sum combinations of each target.
+    for (int i = 0; i < targetSize; ++i)
     {
-        // Make a copy
-        auto currentInputVec = inputVec;
+        if (currentInputVec.empty())
+            break;
 
-        for (int i = 0; i < targetSize; ++i)
+        auto& target = targetVec[i];
+        auto& result = resultVec.emplace_back();
+
+        if (!Algorithms::FindClosestSumToTargetBackTracking(
+                currentInputVec, target, result, errorStr, resultList.m_unitScale))
+            return false;
+
+        auto& combination = result.m_combination;
+
+        // Remove elements from inputVec that has been picked by current result.
+        currentInputVec.erase(std::remove_if(currentInputVec.begin(), currentInputVec.end(),
+                                  [&](auto& inputData) {
+                                      return std::find(combination.begin(), combination.end(),
+                                                 inputData) != combination.end();
+                                  }),
+            currentInputVec.end());
+    }
+
+    if (!resultVec.empty())
+    {
+        auto& lastResult = resultVec.back();
+        if (lastResult.isFinished())
         {
-            if (currentInputVec.empty())
-                break;
-
-            auto& target = targetVec[i];
-            auto& result = resultVec.emplace_back();
-
-            FindClosestSumToTarget(currentInputVec, target, result, true);
-
-            // Remove elements from inputVec that has been picked by current result.
-            currentInputVec.erase(std::remove_if(currentInputVec.begin(), currentInputVec.end(),
-                                      [&](auto& inputData) {
-                                          return std::binary_search(result.m_combination.begin(),
-                                              result.m_combination.end(), inputData);
-                                      }),
-                currentInputVec.end());
+            // Copy reamin inputs
+            resultList.m_remainInputs = currentInputVec;
         }
-
-        // Make sure we have used all input data.
-        assert(currentInputVec.empty());
-
-        // Check if every target that calculated is finished.
-        for (int i = 0; i < resultVec.size(); ++i)
+        else
         {
-            auto& result = resultVec[i];
+            // Make sure we have used all input data.
+            if (!currentInputVec.empty())
+            {
+                errorStr += "Current input vec should be empty now!\n";
+                assert(false);
+                return false;
+            }
+        }
+    }
 
-            // The last one can be unfinished.
-            if (i < resultVec.size() - 1)
-                assert(result.m_isExceeded);
+    // Check if every target's calculation is finished.
+    for (int i = 0; i < resultVec.size(); ++i)
+    {
+        auto& result = resultVec[i];
+
+        // The last one can be unfinished.
+        if (i < resultVec.size() - 1)
+        {
+            if (!result.isFinished())
+            {
+                errorStr += "Every target's calculation needs to be finished!\n";
+                assert(false);
+                return false;
+            }
         }
     }
 
     // Sum all results
-    resultList.m_combiSum = 0;
+    resultList.m_combiSum  = 0;
     resultList.m_remainSum = 0;
-    resultList.m_exeedSum = 0;
+    resultList.m_exeedSum  = 0;
     for (auto& result : resultList.m_list)
     {
         resultList.m_combiSum += result.m_sum;
@@ -339,6 +528,82 @@ bool Calculator::Run(ResultDataList& resultList, std::string& errorStr)
         else
             resultList.m_remainSum += result.m_difference;
     }
+
+    return true;
+}
+
+bool SolutionBestOverral(ResultDataList& resultList, std::string& errorStr,
+    const std::vector<const UserData*>& inputVec, const std::vector<const UserData*>& targetVec)
+{
+    // TODO: use FindClosestSumToTargetDP to get all combinations, and pick each one combination of
+    // the target,then updating a path to walk to the end of the target.
+
+    return false;
+}
+} // namespace Solutions
+} // namespace
+
+namespace JUtils
+{
+bool Calculator::Init(UnitScale::Values unitScale)
+{
+    if (!UnitScale::IsValid(unitScale))
+        return false;
+
+    return true;
+}
+bool JUtils::Calculator::LoadInputData(const char* fileName)
+{
+    return loadUserData(fileName, m_inputDataVec);
+}
+
+bool Calculator::LoadTargetData(const char* fileName)
+{
+    return loadUserData(fileName, m_targetDataList);
+}
+
+bool Calculator::Run(ResultDataList& resultList, std::string& errorStr, Solution solution)
+{
+    // Init result list
+    auto& resultVec = resultList.m_list;
+    resultVec.clear();
+    resultList.m_unitScale = m_unitScale;
+
+    // Init input vector of pointers, avoid extra copies
+    std::vector<const UserData*> inputVec;
+    inputVec.reserve(m_inputDataVec.GetList().size());
+    for (auto& data : m_inputDataVec.GetList())
+        inputVec.emplace_back(&data);
+
+    // Init target lists of pointers
+    std::vector<const UserData*> targetVec;
+    targetVec.reserve(m_targetDataList.GetList().size());
+    for (auto& data : m_targetDataList.GetList())
+        targetVec.emplace_back(&data);
+
+    switch (solution)
+    {
+    case Solution::BestOfEachTarget:
+        return Solutions::SolutionBestOfEachTarget(resultList, errorStr, inputVec, targetVec);
+    case Solution::OverallBest:
+        return false;
+    case Solution::Test:
+    {
+        ResultData result;
+        Algorithms::FindClosestSumToTargetBackTracking(inputVec, targetVec[0], result, errorStr);
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+bool Calculator::loadUserData(const char* fileName, UserDataList& dataList)
+{
+    if (!UserDataList::ReadFromFile(fileName, m_unitScale, dataList))
+        return false;
+
+    if (dataList.GetList().empty())
+        return false;
 
     return true;
 }
