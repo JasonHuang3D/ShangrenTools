@@ -19,56 +19,6 @@ using namespace JUtils;
 
 namespace Algorithms
 {
-std::vector<ResultData> FindAllSumToTarget(
-    const std::vector<const UserData*>& inputDataList, const UserData* pTarget)
-{
-    assert(pTarget);
-
-    std::vector<ResultData> outResults;
-
-    auto targetValue = pTarget->GetData();
-    int inputSize    = static_cast<int>(inputDataList.size());
-
-    // Recursive lambda
-    std::function<void(int, const std::list<int>&)> sumRecursive =
-        [&](int currentInputIndex, const std::list<int>& partialIndexList) -> void {
-        std::uint64_t sum = 0;
-        for (auto& index : partialIndexList)
-            sum += inputDataList[index]->GetData();
-
-        if (sum >= targetValue)
-        {
-            // Found, so all partial numbers are the result.
-            auto& result = outResults.emplace_back();
-
-            result.m_pTarget    = pTarget;
-            result.m_difference = sum - targetValue;
-
-            result.m_combination.reserve(partialIndexList.size());
-            for (auto& index : partialIndexList)
-            {
-                result.m_combination.emplace_back(inputDataList[index]);
-            }
-
-            return;
-        }
-
-        for (auto i = currentInputIndex; i < inputSize; ++i)
-        {
-            // Copy partial and push current data to the end
-            auto partial_rec = partialIndexList;
-            partial_rec.emplace_back(i);
-
-            sumRecursive(i + 1, partial_rec);
-        }
-    };
-
-    std::list<int> tempList;
-    sumRecursive(0, tempList);
-
-    return outResults;
-}
-
 // Time Complexity O(N), TODO: check the algorithm carefully. Currently it produce wrong result
 // depends on input order.
 void FindClosestSumToTargetON(const std::vector<const UserData*>& inputVec, const UserData* pTarget,
@@ -267,7 +217,7 @@ static_assert(
 // Back tracking approach
 bool FindClosestSumToTargetBackTracking(const std::vector<const UserData*>& inputVec,
     const UserData* pTarget, ResultData& outResult, std::string& errorStr,
-    std::uint64_t unitScale = 1, bool getAllComb = false)
+    std::uint64_t unitScale = 1)
 {
     assert(pTarget);
 
@@ -294,26 +244,13 @@ bool FindClosestSumToTargetBackTracking(const std::vector<const UserData*>& inpu
     // Calculate the total sum of every input.
     std::vector<Combination> combinations;
 
-    // Helper function to compute the hash of a combination
-    auto getCombHash = [&](const Combination& comb) -> std::size_t {
-        size_t hash       = 0;
-        auto* currentComb = &comb;
-        for (std::uint32_t i = 0; i < comb.listSize; ++i)
-        {
-
-            HashCombine(hash, optimizedInputDataVec[currentComb->indexToRemove]);
-
-            auto nextIndex = currentComb->parentCombIndex;
-            if (nextIndex != GetInvalidValue(Combination::k_bitsAllCombSize))
-                currentComb = &combinations[nextIndex];
-            else
-                break;
-        }
-
-        return hash;
+    // This set is used for store hash values of each comb. Use our own hash function,
+    // as the value we store is already hashed.
+    struct Hasher
+    {
+        std::size_t operator()(const std::size_t& value) const { return value; }
     };
-    // This set is used for store hash values of each comb.
-    std::unordered_set<std::size_t> combTable;
+    std::unordered_set<std::size_t, Hasher,std::equal_to<std::size_t>> combTable;
 
     auto& init = combinations.emplace_back();
     for (auto& inputData : optimizedInputDataVec)
@@ -321,18 +258,21 @@ bool FindClosestSumToTargetBackTracking(const std::vector<const UserData*>& inpu
         init.remainValue += inputData;
     }
     auto totalValue = init.remainValue;
+    init.hash       = 0;
 
     // Add the init hash
-    combTable.insert(getCombHash(init));
+    combTable.insert(init.hash);
 
     // Init result by copying the init combination.
     Combination opt = combinations.front();
+
+    constexpr auto kInvalidCombSize = GetInvalidValue(Combination::k_bitsAllCombSize);
 
     // Loop over all input data
     for (std::uint32_t i = 0; i < inputSize; ++i)
     {
         auto combSize  = combinations.size();
-        auto inputData = optimizedInputDataVec[i];
+        auto& inputData = optimizedInputDataVec[i];
 
         auto currentCombSize = combSize;
         // Keep tracking previous combinations.
@@ -355,7 +295,7 @@ bool FindClosestSumToTargetBackTracking(const std::vector<const UserData*>& inpu
             if (diff >= optimizedTargetData)
             {
                 // If the data is too large throw an error.
-                if (currentCombSize + 1 >= GetInvalidValue(Combination::k_bitsAllCombSize))
+                if (currentCombSize + 1 >= kInvalidCombSize)
                 {
                     errorStr += "Size of input is too large, try to use fewer inputs!\n";
                     return false;
