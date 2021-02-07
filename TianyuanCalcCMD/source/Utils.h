@@ -3,6 +3,8 @@
 //
 #pragma once
 
+#include <array>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -42,7 +44,7 @@ constexpr std::uint32_t GetInvalidValue(std::uint32_t numBits)
     return static_cast<std::uint32_t>((1LL << numBits) - 1);
 }
 
-// Utils function to compute and combine hash value
+// Helper function to compute and combine hash value
 template <typename T>
 void HashCombine(std::size_t& seed, const T& value)
 {
@@ -63,5 +65,33 @@ std::size_t ComputeHash(const TyepArgs&... args)
     HashCombine(seed, args...);
     return seed;
 }
+
+// Get binary form of the given integer
+template <typename T, typename = typename std::enable_if_t<std::is_integral_v<T>>>
+std::string GetBinaryStrFromInt(T value)
+{
+    return std::bitset<sizeof(T) * 8>(value).to_string();
+}
+
+struct ArrayHelper
+{
+    // A generator for bit mask
+    static constexpr std::uint64_t BitMaskGenerator(std::size_t index) { return 1ll << index; };
+
+    // Helper function to create an array with init values at compile time
+    template <typename T, std::size_t N>
+    static constexpr std::array<T, N> CreateArrayWithInitValues(T (*generator)(std::size_t))
+    {
+        return FillArray(generator, std::make_index_sequence<N>());
+    }
+
+private:
+    template <typename T, std::size_t... I>
+    static constexpr std::array<T, sizeof...(I)> FillArray(
+        T (*generator)(std::size_t), std::index_sequence<I...>)
+    {
+        return std::array<T, sizeof...(I)> { generator(I)... };
+    }
+};
 
 } // namespace JUtils

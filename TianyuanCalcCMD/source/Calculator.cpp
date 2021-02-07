@@ -7,6 +7,7 @@
 #include "Calculator.h"
 #include "Utils.h"
 
+#include <bitset>
 #include <cmath>
 #include <execution>
 #include <functional>
@@ -177,42 +178,21 @@ void FindClosestSumToTargetON(const std::vector<const UserData*>& inputVec, cons
 
 struct Combination
 {
-    // 2 ^ 6 = 64 values.
-    static constexpr std::uint32_t k_bitsIndexToRemove = MAX_COMBO_SIZE_BITS;
+    Combination() {}
+    Combination(float remainValue, std::uint64_t bitFlag, std::size_t hash) :
+        remainValue(remainValue), bitFlag(bitFlag), hash(hash)
+    {
+    }
 
-    // To be the same as index of input to handle max size of combination.
-    static constexpr std::uint32_t k_bitsListSize = k_bitsIndexToRemove;
-
-    // The rest of int, we use it to store the index of comb list.
-    static constexpr std::uint32_t k_bitsAllCombSize = 32 - k_bitsIndexToRemove - k_bitsListSize;
-
-    Combination() :
-        parentCombIndex(GetInvalidValue(k_bitsAllCombSize)),
-        indexToRemove(GetInvalidValue(k_bitsIndexToRemove)),
-        listSize(0),
-        remainValue(0.0f),
-        hash(0) {};
-
-    Combination(float remainValue, std::uint32_t parentCombIndex, std::uint32_t indexToRemove,
-        std::uint32_t listSize, std::size_t hash) :
-        remainValue(0.0f),
-        parentCombIndex(GetInvalidValue(k_bitsAllCombSize)),
-        indexToRemove(GetInvalidValue(k_bitsIndexToRemove)),
-        listSize(0),
-        hash(0) {};
-
-    float remainValue = 0.0f;
-
-    std::uint32_t parentCombIndex : k_bitsAllCombSize;
-
-    std::uint32_t indexToRemove : k_bitsIndexToRemove;
-    std::uint32_t listSize : k_bitsListSize;
-
-    std::size_t hash = 0;
+    float remainValue     = 0.0f;
+    std::uint64_t bitFlag = 0;
+    std::size_t hash      = 0;
 };
-// Make sure we use expected size of combination
-static_assert(
-    sizeof(Combination) == sizeof(float) + 1 * sizeof(std::uint32_t) + sizeof(std::size_t));
+
+// Create our index bit mask at compile time
+constexpr auto k_inputIndexBitMask =
+    ArrayHelper::CreateArrayWithInitValues<std::uint64_t, MAX_INPUT_SIZE>(
+        ArrayHelper::BitMaskGenerator);
 
 // Back tracking approach
 bool FindClosestSumToTargetBackTracking(const std::vector<const UserData*>& inputVec,
@@ -250,15 +230,13 @@ bool FindClosestSumToTargetBackTracking(const std::vector<const UserData*>& inpu
     {
         std::size_t operator()(const std::size_t& value) const { return value; }
     };
-    std::unordered_set<std::size_t, Hasher,std::equal_to<std::size_t>> combTable;
+    std::unordered_set<std::size_t, Hasher, std::equal_to<std::size_t>> combTable;
 
     auto& init = combinations.emplace_back();
     for (auto& inputData : optimizedInputDataVec)
     {
         init.remainValue += inputData;
     }
-    auto totalValue = init.remainValue;
-    init.hash       = 0;
 
     // Add the init hash
     combTable.insert(init.hash);
@@ -266,13 +244,14 @@ bool FindClosestSumToTargetBackTracking(const std::vector<const UserData*>& inpu
     // Init result by copying the init combination.
     Combination opt = combinations.front();
 
-    constexpr auto kInvalidCombSize = GetInvalidValue(Combination::k_bitsAllCombSize);
+    constexpr auto kInvalidCombSize = GetInvalidValue(MAX_COMB_NUM_BIT);
 
     // Loop over all input data
     for (std::uint32_t i = 0; i < inputSize; ++i)
     {
-        auto combSize  = combinations.size();
-        auto& inputData = optimizedInputDataVec[i];
+        auto combSize      = combinations.size();
+        auto& inputData    = optimizedInputDataVec[i];
+        auto& inputBitMask = k_inputIndexBitMask[i];
 
         auto currentCombSize = combSize;
         // Keep tracking previous combinations.
@@ -281,17 +260,21 @@ bool FindClosestSumToTargetBackTracking(const std::vector<const UserData*>& inpu
             // Keep substracting until the result is still larger than the target.
             auto& comb = combinations[j];
 
-            // Combine previous hash of comb with current input data to filter duplicated combs
+            // Filter out same input value to be added with the same combination.
             auto currentHash = comb.hash;
             HashCombine(currentHash, inputData);
             auto exist = combTable.find(currentHash) != combTable.end();
             if (exist)
                 continue;
 
-            auto listSize = comb.listSize;
-            auto diff     = comb.remainValue - inputData;
+            // Compute the difference
+            auto diff = comb.remainValue - inputData;
 
-            // Our gloal is to find the subset that is closest and also greater equal to the target.
+            // Get current flag
+            auto combFlag = comb.bitFlag;
+
+            // Our gloal is to find the subset that is closest and also greater equal to the
+            // target.
             if (diff >= optimizedTargetData)
             {
                 // If the data is too large throw an error.
@@ -302,16 +285,10 @@ bool FindClosestSumToTargetBackTracking(const std::vector<const UserData*>& inpu
                 }
 
                 // Combine the previous result with current index as another new result.
-                auto& newComb       = combinations.emplace_back();
-                newComb.remainValue = diff;
+                auto& newComb =
+                    combinations.emplace_back(diff, combFlag | inputBitMask, currentHash);
 
-                newComb.parentCombIndex = j;
-                newComb.indexToRemove   = i;
-
-                newComb.listSize = listSize + 1;
-
-                // Use current hash
-                newComb.hash = currentHash;
+                // Insert current hash
                 combTable.insert(newComb.hash);
 
                 ++currentCombSize;
@@ -333,35 +310,22 @@ bool FindClosestSumToTargetBackTracking(const std::vector<const UserData*>& inpu
     outResult.m_pTarget = pTarget;
     outResult.m_sum     = 0;
 
-    // Get the indices to remove vec. the remove vec will store all indices in descending order
-    std::vector<std::uint32_t> indicesToRemove(opt.listSize);
-    {
-        Combination* currentComb = &opt;
-        for (std::uint32_t i = 0; i < opt.listSize; ++i)
-        {
-            assert(currentComb->indexToRemove != GetInvalidValue(Combination::k_bitsIndexToRemove));
-
-            indicesToRemove[i] = currentComb->indexToRemove;
-
-            auto nextIndex = currentComb->parentCombIndex;
-            if (nextIndex != GetInvalidValue(Combination::k_bitsAllCombSize))
-                currentComb = &combinations[nextIndex];
-            else
-                break;
-        }
-    }
+    // Get the indices of input to be added to result. The opt stores the indices bit flag that
+    // needs to be removed.
+    auto selectedIndices = ~opt.bitFlag;
 
     for (std::uint32_t i = 0; i < inputSize; ++i)
     {
-        // We skip the indices in opt, and the rest indices is the answer, binary search is valid
-        // here as it stores preivious indices in descending order.
-        if (std::binary_search(indicesToRemove.begin(), indicesToRemove.end(), i, std::greater()))
-            continue;
+        // Starting from lowest bit to see if it is on.
+        if (selectedIndices & 1)
+        {
+            auto& data = orderedInputVec[i];
+            outResult.m_sum += data->GetData();
+            outResult.m_combination.emplace_back(data);
+        }
 
-        auto& data = orderedInputVec[i];
-        outResult.m_sum += data->GetData();
-
-        outResult.m_combination.emplace_back(data);
+        // Remove the lowest bit
+        selectedIndices >>= 1;
     }
 
     outResult.m_difference = outResult.m_sum >= targetValue ? outResult.m_sum - targetValue

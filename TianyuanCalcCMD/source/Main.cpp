@@ -7,8 +7,10 @@
 #include "UserData.h"
 #include "Utils.h"
 
-#define MAX_COMBO_SIZE_BITS 6
 #define MAX_FRACTION_DIGITS_TO_PRINT 2
+
+#define MAX_INPUT_SIZE 64
+#define MAX_COMB_NUM_BIT 32
 #include "Calculator.h"
 
 #include <iomanip>
