@@ -30,7 +30,11 @@ enum class AppState : std::uint8_t
     Calculating,
     Exit
 };
-
+struct State
+{
+    AppState appState                 = AppState::Idle;
+    Calculator::Solution calcSolution = Calculator::Solution::None;
+};
 void PrintLargeSpace()
 {
     std::cout << "=========================================" << std::endl << std::endl;
@@ -49,37 +53,38 @@ void PrintInputData(std::uint32_t printIndex, const UserData* pUserData, std::ui
               << FormatIntToFloat<double>(pUserData->GetData(), unitScale)
               << UnitScale::GetUnitStr(unitScale) << std::endl;
 }
-AppState GetCurrentState()
+void GetCurrentState(State& outState)
 {
     char input;
     std::cout << u8"请输入r计算, q退出, c清屏: " << std::endl;
     std::cin >> input;
 
-    auto outState = AppState::Idle;
+    outState.calcSolution = Calculator::Solution::None;
     switch (input)
     {
     case 'r':
-        outState = AppState::Calculating;
+        outState.appState     = AppState::Calculating;
+        outState.calcSolution = Calculator::Solution::BestOfEachTarget;
+        break;
+    case 'o':
+        //outState.appState     = AppState::Calculating;
+        //outState.calcSolution = Calculator::Solution::OverallBest;
         break;
     case 'q':
-        outState = AppState::Exit;
+        outState.appState = AppState::Exit;
         break;
     case 'c':
-        outState = AppState::ClearScreen;
+        outState.appState = AppState::ClearScreen;
         break;
     default:
-        outState = AppState::Idle;
+        outState.appState = AppState::Idle;
         break;
     }
-
-    return outState;
 }
 } // namespace
 
 int main(int argc, char* argv[])
 {
-    AppState appState = AppState::Idle;
-
 #if defined(WIN32) && defined(M_DEBUG)
     // Detecting memory leaks using CRT dbg
     ::_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -94,13 +99,14 @@ int main(int argc, char* argv[])
     std::cout << std::fixed;
     std::cout << std::setprecision(MAX_FRACTION_DIGITS_TO_PRINT);
 
+    State currentState;
     Calculator calculator;
 
-    while (appState != AppState::Exit)
+    while (currentState.appState != AppState::Exit)
     {
-        appState = GetCurrentState();
+        GetCurrentState(currentState);
 
-        switch (appState)
+        switch (currentState.appState)
         {
         case AppState::Idle:
             std::cout << u8"等待输入正确命令..." << std::endl;
@@ -124,10 +130,16 @@ int main(int argc, char* argv[])
                 break;
             }
 
+            // Print input out put size
+            auto inputSize  = calculator.GetInputDataVec().GetList().size();
+            auto targetSize = calculator.GetTargetDataVec().GetList().size();
+            std::cout << u8"需要计算: " << inputSize << u8"个仙人, " << targetSize << u8"个目标"
+                      << std::endl;
+
             // Run
             ResultDataList resultList;
             std::string errorStr;
-            if (calculator.Run(resultList, errorStr, Calculator::Solution::BestOfEachTarget))
+            if (calculator.Run(resultList, errorStr, currentState.calcSolution))
             {
                 // Print the results
                 auto unitStr = UnitScale::GetUnitStr(resultList.m_unitScale);

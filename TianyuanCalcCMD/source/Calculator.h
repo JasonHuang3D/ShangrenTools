@@ -27,7 +27,8 @@ class Calculator
 public:
     enum class Solution
     {
-        BestOfEachTarget = 0,
+        None = 0,
+        BestOfEachTarget,
         OverallBest,
 
         Test
@@ -41,6 +42,10 @@ public:
     bool LoadTargetData(const char* fileName);
 
     bool Run(ResultDataList& resultList, std::string& errorStr, Solution solution);
+
+
+    const UserDataList& GetInputDataVec() const { return m_inputDataVec; }
+    const UserDataList& GetTargetDataVec() const { return m_targetDataList; }
 
 private:
     bool loadUserData(const char* fileName, UserDataList& dataList);

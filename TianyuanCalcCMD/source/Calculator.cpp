@@ -12,6 +12,7 @@
 #include <execution>
 #include <functional>
 #include <list>
+#include <sstream>
 #include <unordered_set>
 
 namespace
@@ -307,7 +308,12 @@ bool FindSumToTargetBackTracking(const std::vector<const UserData*>& inputVec,
     }
 
 #ifdef M_DEBUG
-    std::cout << "Size of combs: " << outCombVec.size() << std::endl;
+    {
+        std::stringstream msg;
+        msg << "Current target is: " << pTarget->GetDesc()
+            << " Size of combs: " << outCombVec.size() << std::endl;
+        std::cout << msg.str();
+    }
 #endif // M_DEBUG
 
     // Out put closest comb
@@ -360,7 +366,6 @@ bool SolutionBestOfEachTarget(const std::vector<const UserData*>& inputVec,
         result.m_sum     = 0;
 
         auto& closestComb = allSumsOfTarget[closestCombIndex];
-
         // Get the indices of input to be added to result. The opt stores the indices bit flag that
         // needs to be removed.
         auto selectedIndices  = ~closestComb.bitFlag;
@@ -449,18 +454,129 @@ bool SolutionBestOfEachTarget(const std::vector<const UserData*>& inputVec,
     return true;
 }
 
-bool SolutionBestOverral(ResultDataList& resultList, std::string& errorStr,
-    const std::vector<const UserData*>& inputVec, const std::vector<const UserData*>& targetVec)
+
+// TODO: Need research to find out a better algorithm. Such as A* path finding or simple Dijkstra.
+bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
+    const std::vector<const UserData*>& targetVec, ResultDataList& resultList,
+    std::string& errorStr)
 {
-    auto& resultVec = resultList.m_list;
-    auto targetSize = targetVec.size();
+    auto& resultVec       = resultList.m_list;
+    const auto targetSize = targetVec.size();
+    const auto inputSize  = inputVec.size();
 
-    for (int i = 0; i < targetSize; ++i)
+    if (inputSize == 0)
     {
-        auto& target = targetVec[i];
-        auto& result = resultVec.emplace_back();
+        errorStr += "Input size should not be 0!\n";
+        assert(false);
+        return false;
+    }
+    // Make a copy
+    auto orderedInputVec = inputVec;
+    // Sort the input data by descending order
+    std::sort(std::execution::par_unseq, orderedInputVec.begin(), orderedInputVec.end(),
+        [&](const UserData* a, const UserData* b) -> bool { return *a > *b; });
 
-        auto& combination = result.m_combination;
+    // Fistly, get all possible combinations of each target.
+    std::vector<std::vector<Algorithms::Combination>> allCombVec(targetSize);
+    {
+        // Make error handling thread safe
+        std::vector<std::string> allErrorStrVec(targetSize);
+        std::atomic<bool> hasError = false;
+
+        // Iterate indices rather than vector
+        std::vector<int> targetIndices(targetSize);
+        for (int i = 0; i < targetSize; ++i)
+            targetIndices[i] = i;
+
+        // Parallel for each
+        std::for_each(std::execution::par_unseq, targetIndices.begin(), targetIndices.end(),
+            [&](int targetIndex) {
+#ifdef M_DEBUG
+                std::stringstream msg;
+                msg << "Currently processing: " << targetIndex << std::endl;
+                std::cout << msg.str();
+#endif // M_DEBUG
+
+                hasError = hasError ||
+                    !Algorithms::FindSumToTargetBackTracking(orderedInputVec,
+                        targetVec[targetIndex], resultList.m_unitScale, allErrorStrVec[targetIndex],
+                        allCombVec[targetIndex], nullptr);
+            });
+
+        // Sync the error results
+        if (hasError)
+        {
+            for (int i = 0; i < targetSize; ++i)
+            {
+                auto& currentError = allErrorStrVec[i];
+                if (currentError.empty())
+                    continue;
+                errorStr += allErrorStrVec[i];
+            }
+            return false;
+        }
+    }
+
+    std::size_t pathSize = 0;
+    // Secondly, walk through all combs to find the best result
+    if (!allCombVec.empty())
+    {
+        struct Path
+        {
+            std::uint64_t level = 0;
+        };
+        Path bestPath;
+
+        // Config max picked table by removing the bits from left most to match number of inputs
+        auto maxPickedIndices = std::numeric_limits<std::uint64_t>::max();
+        {
+            auto numBitsToRemove = MAX_INPUT_SIZE - inputSize;
+            maxPickedIndices >>= numBitsToRemove;
+        }
+
+        std::vector<int> stackIndexResult(targetSize);
+        std::function<void(std::uint64_t, int)> walkRecursion = [&](std::uint64_t pickedIndices,
+                                                                    int targetIndex) -> void {
+            // We reached the end of the path
+            if (pickedIndices == maxPickedIndices || targetIndex >= targetSize)
+            {
+                //if(targetIndex >= targetSize)
+                    //std::cout << pickedIndices << std::endl;
+                ++pathSize;
+                return;
+            }
+
+            auto& currentCombVec = allCombVec[targetIndex];
+            auto currentCombSize = currentCombVec.size();
+            for (int i = 0; i < currentCombSize; ++i)
+            {
+                auto& currentComb = currentCombVec[i];
+                auto currentPickedIndices = pickedIndices;
+
+
+                auto combIndices  = ~currentComb.bitFlag;
+
+                // Remove unused bits.
+                combIndices &= maxPickedIndices;
+
+                // Skip already picked indices.
+                if ((currentPickedIndices & combIndices) != 0)
+                    continue;
+
+                // Mark current indices as picked.
+                currentPickedIndices |= combIndices;
+
+                // Save current result.
+                stackIndexResult[targetIndex] = i;
+
+                walkRecursion(currentPickedIndices, targetIndex + 1);
+
+                // Reset current result.
+                stackIndexResult[targetIndex] = 0;
+            }
+        };
+
+        walkRecursion(0, 0);
     }
 
     return true;
@@ -511,7 +627,7 @@ bool Calculator::Run(ResultDataList& resultList, std::string& errorStr, Solution
     case Solution::BestOfEachTarget:
         return Solutions::SolutionBestOfEachTarget(inputVec, targetVec, resultList, errorStr);
     case Solution::OverallBest:
-        return false;
+        return Solutions::SolutionBestOverral(inputVec, targetVec, resultList, errorStr);
     case Solution::Test:
     {
         return true;
