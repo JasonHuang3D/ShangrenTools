@@ -10,7 +10,7 @@ set target_name=TianyuanCalcCMD
 set build_folder=build
 set build_mode=MinSizeRel
 set dest_folder=%~dp0bin\
-set dest_name=通用副本工具beta1.2.zip
+set dest_name=通用副本工具beta1.3.zip
 set intro_file="说明.txt"
 
 set parent_folder=%~dp0..\
