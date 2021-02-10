@@ -99,7 +99,7 @@ function(add_app APP_NAME IDE_FOLDER WINDOWED SOURCE ASSETS RESFILES)
 endfunction()
 #====================End Helper functions===========================================#
 
-add_subdirectory(TianyuanCalcCMD)
+add_subdirectory(Code)
 
 # Config visual studio default startup project
 if(TARGET TianyuanCalcCMD)
