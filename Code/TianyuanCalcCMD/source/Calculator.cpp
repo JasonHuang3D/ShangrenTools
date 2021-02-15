@@ -466,7 +466,8 @@ void ParseIndicesToUserData(
         // Starting from lowest bit to see if it is on.
         if (indices & 1)
         {
-            callBack(inputVec[i]);
+            if (!callBack(inputVec[i]))
+                break;
         }
         // Remove the lowest bit
         indices >>= 1;
@@ -486,9 +487,10 @@ bool ConfigResultData(const std::vector<const UserData*>& inputVec, std::uint64_
     result.m_pTarget = pTarget;
     result.m_sum     = 0;
 
-    ParseIndicesToUserData(inputVec, selectedIndices, [&](const UserData* data) {
+    ParseIndicesToUserData(inputVec, selectedIndices, [&](const UserData* data) -> bool {
         result.m_sum += data->GetData();
         result.m_combination.emplace_back(data);
+        return true;
     });
 
     // Config the difference
@@ -570,7 +572,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
 {
     // Get the referenced solution result.
     std::uint32_t refMaxNumFinishedTarget = 0;
-    float refMinExeedSum                  = 0.0f;
+    float refMinExeedSum                  = std::numeric_limits<float>::max();
     {
         if (!SolutionBestOfEachTarget(inputVec, targetVec, resultList, errorStr))
             return false;
@@ -702,6 +704,48 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
                         outputPath(targetIndex, prevExeed);
                         return;
                     }
+                    else if (targetIndex + 1 > refMaxNumFinishedTarget)
+                    {
+
+                        // At this point, we still have unpicked indices and still have targets to
+                        // finish.
+
+                        // We make a prediction to see remianing indices are enough to finish this
+                        // target.
+                        auto remianIndices            = pickedIndices ^ maxPickedIndices;
+                        std::uint64_t sum             = 0;
+                        bool canFinish                = false;
+                        const auto& currentTargetData = targetVec[targetIndex]->GetData();
+                        ParseIndicesToUserData(
+                            orderedInputVec, remianIndices, [&](const UserData* pUserData) {
+                                sum += pUserData->GetData();
+                                if (sum >= currentTargetData)
+                                {
+                                    canFinish = true;
+                                    return false;
+                                }
+                                return true;
+                            });
+
+                        // if the prediction we have made can not finish the target, then we just
+                        // end this path.
+                        if (!canFinish)
+                        {
+                            outputPath(targetIndex, prevExeed);
+                            return;
+                        }
+                        else
+                        {
+                            auto fSum = static_cast<float>(
+                                static_cast<double>(sum) / resultList.m_unitScale);
+
+                            // if we can finish this target, update the refs.
+                            std::lock_guard lock(recordResultMutex);
+                            refMaxNumFinishedTarget = targetIndex;
+
+                            refMinExeedSum = prevExeed + fSum;
+                        }
+                    }
 
                     const auto& currentCombVec = allCombVec[targetIndex];
                     // Skip if exeed sum already greater than the sum of previous full path.
@@ -790,6 +834,8 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
                     auto& result                = resultVec.emplace_back();
                     ConfigResultData(
                         orderedInputVec, remainIndices, pCurrentTarget, result, errorStr);
+
+                    allPickedIndices |= remainIndices;
                 }
 
                 break;
@@ -818,8 +864,11 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
         {
             std::uint64_t remainIndices = allPickedIndices ^ maxPickedIndices;
 
-            ParseIndicesToUserData(orderedInputVec, remainIndices,
-                [&](const UserData* pData) { resultList.m_remainInputs.emplace_back(pData); });
+            ParseIndicesToUserData(
+                orderedInputVec, remainIndices, [&](const UserData* pData) -> bool {
+                    resultList.m_remainInputs.emplace_back(pData);
+                    return true;
+                });
         }
     }
 

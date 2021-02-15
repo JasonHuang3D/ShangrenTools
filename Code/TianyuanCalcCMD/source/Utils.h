@@ -4,6 +4,7 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <functional>
 #include <string>
 #include <vector>
@@ -101,7 +102,7 @@ private:
 template <typename T>
 struct LambdaCombinator
 {
-    LambdaCombinator(T lambda) :lambda(lambda) {}
+    LambdaCombinator(T lambda) : lambda(lambda) {}
 
     template <class... TArgs>
     decltype(auto) operator()(TArgs&&... args) const
@@ -116,4 +117,25 @@ struct LambdaCombinator
 template <class T>
 LambdaCombinator(T) -> LambdaCombinator<T>;
 
+class Timer
+{
+public:
+    Timer() { Reset(); }
+    // Starts/resets the high resolution timer.
+    void Reset() { m_t0 = m_clock.now(); }
+
+    double DurationInSec() { return Elapsed() * 0.001; }
+    double DurationInMsec() { return Elapsed(); }
+
+private:
+    double Elapsed() const
+    {
+        std::chrono::time_point<std::chrono::high_resolution_clock> t1 = m_clock.now();
+        std::chrono::milliseconds dt =
+            std::chrono::duration_cast<std::chrono::milliseconds>(t1 - m_t0);
+        return static_cast<double>(dt.count());
+    }
+    std::chrono::high_resolution_clock m_clock;
+    std::chrono::time_point<std::chrono::high_resolution_clock> m_t0;
+};
 } // namespace JUtils

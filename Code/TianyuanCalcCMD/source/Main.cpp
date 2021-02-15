@@ -56,7 +56,7 @@ void PrintInputData(std::uint32_t printIndex, const UserData* pUserData, std::ui
 void GetCurrentState(State& outState)
 {
     char input;
-    std::cout << u8"请输入r计算, q退出, c清屏: " << std::endl;
+    std::cout << u8"请输入r或t计算, q退出, c清屏: " << std::endl;
     std::cin >> input;
 
     outState.calcSolution = Calculator::Solution::None;
@@ -66,7 +66,7 @@ void GetCurrentState(State& outState)
         outState.appState     = AppState::Calculating;
         outState.calcSolution = Calculator::Solution::BestOfEachTarget;
         break;
-    case 'o':
+    case 't':
         outState.appState     = AppState::Calculating;
         outState.calcSolution = Calculator::Solution::OverallBest;
         break;
@@ -144,10 +144,14 @@ int main(int argc, char* argv[])
             std::cout << u8"需要计算: " << inputSize << u8"个仙人, " << targetSize << u8"个目标."
                       << std::endl;
 
-            // Run
+            // Run and record time spent
             ResultDataList resultList;
             std::string errorStr;
-            if (calculator.Run(resultList, errorStr, currentState.calcSolution))
+            Timer timer;
+            bool isSucceed = calculator.Run(resultList, errorStr, currentState.calcSolution);
+            auto timeSpent = timer.DurationInSec();
+
+            if (isSucceed)
             {
                 // Print the results
                 auto unitStr = UnitScale::GetUnitStr(resultList.m_unitScale);
@@ -213,8 +217,6 @@ int main(int argc, char* argv[])
                     auto& userData = remainInputs[i];
                     PrintInputData(i + 1, userData, resultList.m_unitScale);
                 }
-
-                PrintLargeSpace();
             }
             else
             {
@@ -223,6 +225,10 @@ int main(int argc, char* argv[])
                 break;
             }
 
+            std::cout << std::setprecision(3);
+            std::cout << u8"计算时长: " << timeSpent << " 秒"<<std::endl;
+            std::cout << std::setprecision(MAX_FRACTION_DIGITS_TO_PRINT);
+            PrintLargeSpace();
             break;
         }
         case AppState::ClearScreen:
