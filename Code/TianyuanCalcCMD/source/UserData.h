@@ -131,12 +131,14 @@ struct ResultDataList
 
 public:
     std::uint64_t m_unitScale = UnitScale::k_10K;
-    std::vector<ResultData> m_list;
+    std::vector<ResultData> m_selectedInputs;
     std::vector<const UserData*> m_remainInputs;
 
     std::uint64_t m_combiSum  = 0;
     std::uint64_t m_exeedSum  = 0;
     std::uint64_t m_remainSum = 0;
+
+    std::uint32_t m_numfinished = 0;
 };
 
 } // namespace JUtils

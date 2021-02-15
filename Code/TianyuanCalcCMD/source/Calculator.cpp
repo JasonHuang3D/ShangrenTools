@@ -10,9 +10,9 @@
 #include <bitset>
 #include <cmath>
 #include <execution>
-#include <functional>
 #include <list>
 #include <sstream>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace
@@ -177,156 +177,235 @@ void FindClosestSumToTargetON(const std::vector<const UserData*>& inputVec, cons
     }
 }
 
-struct Combination
-{
-    Combination() {}
-    Combination(float remainValue, std::uint64_t bitFlag, std::size_t hash) :
-        remainValue(remainValue), bitFlag(bitFlag), hash(hash)
-    {
-    }
-
-    float remainValue = 0.0f;
-
-    // Bit flag represent the index of input vector that need to be removed
-    std::uint64_t bitFlag = 0;
-    std::size_t hash      = 0;
-};
-
 // Create our index bit mask at compile time
 constexpr auto k_inputIndexBitMask =
     ArrayHelper::CreateArrayWithInitValues<std::uint64_t, MAX_INPUT_SIZE>(
         ArrayHelper::BitMaskGenerator);
 
+struct OutputCombination
+{
+    OutputCombination(float sum, float diff, std::uint64_t selectedIndices) :
+        sum(sum), diff(diff), selectedIndices(selectedIndices) {};
+
+    OutputCombination(OutputCombination&&) = default;
+    OutputCombination& operator=(OutputCombination&&) = default;
+
+    float sum = 0.0f;
+
+    // Sum - target
+    float diff                    = std::numeric_limits<float>::max();
+    std::uint64_t selectedIndices = 0;
+};
+static_assert(sizeof(OutputCombination) == sizeof(float) * 2 + sizeof(std::uint64_t));
+
+// Config max picked table by removing the bits from left most to match number of inputs
+template <typename T, typename = typename std::enable_if_t<std::is_integral_v<T>>>
+constexpr std::uint64_t GetMaxPickedIndices(T inputSize)
+{
+    assert(inputSize > 0);
+
+    auto out = std::numeric_limits<std::uint64_t>::max();
+
+    auto numBitsToRemove = MAX_INPUT_SIZE - inputSize;
+    out >>= numBitsToRemove;
+    return out;
+}
+
 // Back tracking approach
 bool FindSumToTargetBackTracking(const std::vector<const UserData*>& inputVec,
     const UserData* pTarget, std::uint64_t unitScale, std::string& errorStr,
-    std::vector<Combination>& outCombVec, std::uint32_t* pOutClosestCombIndex = nullptr)
+    std::uint64_t* pOutClosestCombIndices                 = nullptr,
+    std::vector<OutputCombination>* pOutAllCombIndicesVec = nullptr)
 {
-    assert(pTarget);
+    if (!pTarget)
+    {
+        errorStr += "Target can not be null\n";
+        assert(false);
+        return false;
+    }
+
+    if (inputVec.empty())
+    {
+        errorStr += "InputVec can not be empty\n";
+        assert(false);
+        return false;
+    }
 
     auto targetValue = pTarget->GetData();
     auto inputSize   = static_cast<std::uint32_t>(inputVec.size());
-    outCombVec.clear();
 
-    // Init optimized inputData
-    std::vector<float> optimizedInputDataVec;
-    optimizedInputDataVec.reserve(inputSize);
-    for (auto& input : inputVec)
-    {
-        auto dInput = static_cast<double>(input->GetData());
+    // Init closest sum index of combsVec
+    bool needsToOutPutClosestComb      = pOutClosestCombIndices != nullptr;
+    std::uint64_t outClosetCombIndices = 0;
 
-        optimizedInputDataVec.emplace_back(static_cast<float>(dInput / unitScale));
-    }
-    // Init optimized target data
-    auto optimizedTargetData = static_cast<float>(static_cast<double>(targetValue) / unitScale);
-
-    // This set is used for store hash values of each comb. Use our own hash function,
-    // as the value we store is already hashed.
-    struct Hasher
-    {
-        std::size_t operator()(const std::size_t& value) const { return value; }
-    };
-    std::unordered_set<std::size_t, Hasher, std::equal_to<std::size_t>> combTable;
-
-    auto& init = outCombVec.emplace_back();
-    for (auto& inputData : optimizedInputDataVec)
-    {
-        init.remainValue += inputData;
-    }
-
-    // Add the init hash
-    combTable.insert(init.hash);
-
-    // Init closest sum index of outCombVec
-    bool needsToOutPutClosestComb  = pOutClosestCombIndex != nullptr;
-    std::uint32_t closestCombIndex = 0;
-    if (needsToOutPutClosestComb)
-    {
-        *pOutClosestCombIndex = closestCombIndex;
-    }
-
+    // Start the calculation scope
     constexpr auto kInvalidCombSize = GetInvalidValue(MAX_COMB_NUM_BIT);
-
-    // Loop over all input data
-    for (std::uint32_t i = 0; i < inputSize; ++i)
     {
-        auto combSize      = outCombVec.size();
-        auto& inputData    = optimizedInputDataVec[i];
-        auto& inputBitMask = k_inputIndexBitMask[i];
-
-        auto currentCombSize = combSize;
-        // Keep tracking previous combinations.
-        for (std::uint32_t j = 0; j < combSize; ++j)
+        // Init optimized inputData
+        std::vector<float> optimizedInputDataVec;
+        optimizedInputDataVec.reserve(inputSize);
+        for (auto& input : inputVec)
         {
-            // Keep substracting until the result is still larger than the target.
-            auto& comb = outCombVec[j];
+            auto dInput = static_cast<double>(input->GetData());
+            optimizedInputDataVec.emplace_back(static_cast<float>(dInput / unitScale));
+        }
+        // Init optimized target data
+        auto optimizedTargetData = static_cast<float>(static_cast<double>(targetValue) / unitScale);
 
-            // Filter out same input value to be added with the same combination.
-            auto currentHash = comb.hash;
-            HashCombine(currentHash, inputData);
-            auto exist = combTable.find(currentHash) != combTable.end();
-            if (exist)
-                continue;
+        // This set is used for store hash values of each comb. Use our own hash function,
+        // as the value we store is already hashed.
+        struct Hasher
+        {
+            std::size_t operator()(const std::size_t& value) const { return value; }
+        };
+        std::unordered_set<std::size_t, Hasher, std::equal_to<std::size_t>> combTable;
 
-            // Compute the difference
-            auto diff = comb.remainValue - inputData;
-
-            // Get current flag
-            auto combFlag = comb.bitFlag;
-
-            // Our gloal is to find the subset that is closest and also greater equal to the
-            // target.
-            if (diff >= optimizedTargetData)
+        struct Combination
+        {
+            Combination() {}
+            Combination(float remainValue, std::uint64_t bitFlag, std::size_t hash) :
+                remainValue(remainValue), bitFlag(bitFlag), hash(hash)
             {
-                // If the data is too large throw an error.
-                if (currentCombSize + 1 >= kInvalidCombSize)
+            }
+
+            float remainValue = 0.0f;
+
+            // Bit flag represent the index of input vector that need to be removed
+            std::uint64_t bitFlag = 0;
+            std::size_t hash      = 0;
+        };
+        std::vector<Combination> combsVec;
+        auto& init = combsVec.emplace_back();
+        for (auto& inputData : optimizedInputDataVec)
+        {
+            init.remainValue += inputData;
+        }
+        // Add the init hash
+        combTable.insert(init.hash);
+
+        // Init closet index of combsVec
+        std::uint32_t closetCombIndexOfVec = 0;
+
+        // Loop over all input data
+        for (std::uint32_t i = 0; i < inputSize; ++i)
+        {
+            auto combSize      = combsVec.size();
+            auto& inputData    = optimizedInputDataVec[i];
+            auto& inputBitMask = k_inputIndexBitMask[i];
+
+            auto currentCombSize = combSize;
+            // Keep tracking previous combinations.
+            for (std::uint32_t j = 0; j < combSize; ++j)
+            {
+                // Keep substracting until the result is still larger than the target.
+                auto& comb = combsVec[j];
+
+                // Filter out same input value to be added with the same combination.
+                auto currentHash = comb.hash;
+                HashCombine(currentHash, inputData);
+                auto exist = combTable.find(currentHash) != combTable.end();
+                if (exist)
+                    continue;
+
+                // Compute the difference
+                auto diff = comb.remainValue - inputData;
+
+                // Get current flag
+                auto combFlag = comb.bitFlag;
+
+                // Our gloal is to find the subset that is closest and also greater equal to the
+                // target.
+                if (diff >= optimizedTargetData)
                 {
-                    errorStr += "Size of input is too large, try to use fewer inputs!\n";
-                    return false;
-                }
-
-                // Combine the previous result with current index as another new result.
-                auto& newComb = outCombVec.emplace_back(diff, combFlag | inputBitMask, currentHash);
-
-                // Insert current hash
-                combTable.insert(newComb.hash);
-
-                // Get the optimal result
-                if (needsToOutPutClosestComb)
-                {
-                    auto& closest = outCombVec[closestCombIndex];
-                    if (newComb.remainValue < closest.remainValue)
+                    // If the data is too large throw an error.
+                    if (currentCombSize + 1 >= kInvalidCombSize)
                     {
-                        // newComb index is the end of outCombVec
-                        closestCombIndex = static_cast<std::uint32_t>(currentCombSize);
+                        errorStr += "Size of input is too large, try to use fewer inputs!\n";
+                        return false;
                     }
-                }
 
-                ++currentCombSize;
+                    // Combine the previous result with current index as another new result.
+                    auto& newComb =
+                        combsVec.emplace_back(diff, combFlag | inputBitMask, currentHash);
+
+                    // Insert current hash
+                    combTable.insert(newComb.hash);
+
+                    // Get the optimal result
+                    if (needsToOutPutClosestComb)
+                    {
+                        auto& closestComb = combsVec[closetCombIndexOfVec];
+                        if (newComb.remainValue < closestComb.remainValue)
+                        {
+                            // The closet index of vec is the newComb index of combsVec
+                            closetCombIndexOfVec = static_cast<std::uint32_t>(currentCombSize);
+                        }
+                    }
+
+                    ++currentCombSize;
+                }
             }
         }
-    }
 
 #ifdef M_DEBUG
-    {
-        std::stringstream msg;
-        msg << "Current target is: " << pTarget->GetDesc()
-            << " Size of combs: " << outCombVec.size() << std::endl;
-        std::cout << msg.str();
-    }
+        {
+            std::stringstream msg;
+            msg << "Current pTarget is: " << pTarget->GetDesc()
+                << " Size of combs: " << combsVec.size() << std::endl;
+            std::cout << msg.str();
+        }
 #endif // M_DEBUG
 
-    // Out put closest comb
-    if (needsToOutPutClosestComb)
-    {
-        if (closestCombIndex >= outCombVec.size())
+        auto maxPickedIndices = GetMaxPickedIndices(inputSize);
+        // Out put closest comb
+        if (needsToOutPutClosestComb)
         {
-            errorStr += "closestCombIndex is out of range of outCombVec\n";
-            assert(false);
-            return false;
+            auto& closestComb = combsVec[closetCombIndexOfVec];
+            // Reverse "remove" to "pick" indices.
+            outClosetCombIndices = ~closestComb.bitFlag;
+            // Remove the unused bits.
+            outClosetCombIndices &= maxPickedIndices;
+
+            *pOutClosestCombIndices = outClosetCombIndices;
         }
-        *pOutClosestCombIndex = closestCombIndex;
-    }
+
+        // Out put all combs vec
+        if (pOutAllCombIndicesVec)
+        {
+            auto& outCombVec = *pOutAllCombIndicesVec;
+            outCombVec.clear();
+            auto size = combsVec.size();
+            outCombVec.reserve(size);
+            for (auto& comb : combsVec)
+            {
+                auto indices = ~comb.bitFlag;
+                indices &= maxPickedIndices;
+
+                auto diff = comb.remainValue - optimizedTargetData;
+                if (diff < 0)
+                {
+                    // Make sure all indices have been picked when comb sum can not finish the
+                    // target.
+                    if (indices != maxPickedIndices)
+                    {
+                        errorStr +=
+                            "All indices must be picked, when comb sum is not enough to finish the "
+                            "pTarget\n";
+                        assert(false);
+                        return false;
+                    }
+                }
+                outCombVec.emplace_back(comb.remainValue, diff, indices);
+            }
+
+            // Sort by ascending order of diff
+            std::sort(std::execution::par_unseq, outCombVec.begin(), outCombVec.end(),
+                [](const OutputCombination& a, const OutputCombination& b) -> bool {
+                    return a.diff < b.diff;
+                });
+        }
+
+    } // End calculation scope
 
     return true;
 }
@@ -335,63 +414,123 @@ bool FindSumToTargetBackTracking(const std::vector<const UserData*>& inputVec,
 
 namespace Solutions
 {
-bool SolutionBestOfEachTarget(const std::vector<const UserData*>& inputVec,
-    const std::vector<const UserData*>& targetVec, ResultDataList& resultList,
-    std::string& errorStr)
+
+bool ConfigResultListByResults(ResultDataList& resultList, std::string& errorStr)
 {
-    auto& resultVec = resultList.m_list;
-    // Make a copy
-    auto currentInputVec = inputVec;
-    // Sort the input data by descending  order
-    std::sort(std::execution::par, currentInputVec.begin(), currentInputVec.end(),
-        [&](const UserData* a, const UserData* b) -> bool { return *a > *b; });
-
-    std::vector<Algorithms::Combination> allSumsOfTarget;
-
-    for (auto& target : targetVec)
+    const auto& resultVec    = resultList.m_selectedInputs;
+    const auto resultVecSize = resultVec.size();
+    // Count all finished result and check if every target's calculation is finished.
+    resultList.m_numfinished = 0;
+    for (int i = 0; i < resultVecSize; ++i)
     {
-        if (currentInputVec.empty())
-            break;
+        auto& result = resultVec[i];
 
-        auto targetData = target->GetData();
-
-        std::uint32_t closestCombIndex = 0;
-        if (!Algorithms::FindSumToTargetBackTracking(currentInputVec, target,
-                resultList.m_unitScale, errorStr, allSumsOfTarget, &closestCombIndex))
-            return false;
-
-        // After get the opt, we config the result.
-        auto& result     = resultVec.emplace_back();
-        result.m_pTarget = target;
-        result.m_sum     = 0;
-
-        auto& closestComb = allSumsOfTarget[closestCombIndex];
-        // Get the indices of input to be added to result. The opt stores the indices bit flag that
-        // needs to be removed.
-        auto selectedIndices  = ~closestComb.bitFlag;
-        auto currentInputSize = currentInputVec.size();
-        for (std::uint32_t i = 0; i < currentInputSize; ++i)
+        if (result.isFinished())
         {
-            // Starting from lowest bit to see if it is on.
-            if (selectedIndices & 1)
-            {
-                auto& data = currentInputVec[i];
-                result.m_sum += data->GetData();
-                result.m_combination.emplace_back(data);
-            }
-
-            // Remove the lowest bit
-            selectedIndices >>= 1;
+            ++resultList.m_numfinished;
         }
+        else if (i < resultVecSize - 1)
+        {
+            // The last one can be unfinished.
 
-        // Config the difference
+            errorStr += "Every pTarget's calculation needs to be finished!\n";
+            assert(false);
+            return false;
+        }
+    }
+
+    // Sum all results
+    resultList.m_combiSum  = 0;
+    resultList.m_remainSum = 0;
+    resultList.m_exeedSum  = 0;
+    for (auto& result : resultVec)
+    {
+        resultList.m_combiSum += result.m_sum;
+
+        if (result.m_isExceeded)
+            resultList.m_exeedSum += result.m_difference;
+        else
+            resultList.m_remainSum += result.m_difference;
+    }
+
+    return true;
+}
+
+template <typename T>
+void ParseIndicesToUserData(
+    const std::vector<const UserData*>& inputVec, std::uint64_t indices, T callBack)
+{
+    const auto currentInputSize = inputVec.size();
+    for (std::uint32_t i = 0; i < currentInputSize; ++i)
+    {
+        // Starting from lowest bit to see if it is on.
+        if (indices & 1)
+        {
+            callBack(inputVec[i]);
+        }
+        // Remove the lowest bit
+        indices >>= 1;
+    }
+}
+bool ConfigResultData(const std::vector<const UserData*>& inputVec, std::uint64_t selectedIndices,
+    const UserData* pTarget, ResultData& result, std::string& errorStr)
+{
+
+    if (!pTarget)
+    {
+        errorStr += "Target can not be null!\n";
+        assert(false);
+        return false;
+    }
+
+    result.m_pTarget = pTarget;
+    result.m_sum     = 0;
+
+    ParseIndicesToUserData(inputVec, selectedIndices, [&](const UserData* data) {
+        result.m_sum += data->GetData();
+        result.m_combination.emplace_back(data);
+    });
+
+    // Config the difference
+    {
+        const auto targetData = pTarget->GetData();
         result.m_difference =
             result.m_sum >= targetData ? result.m_sum - targetData : targetData - result.m_sum;
 
         result.m_isExceeded = result.m_sum > targetData;
+    }
+
+    return true;
+}
+
+bool SolutionBestOfEachTarget(const std::vector<const UserData*>& inputVec,
+    const std::vector<const UserData*>& targetVec, ResultDataList& resultList,
+    std::string& errorStr)
+{
+    auto& resultVec = resultList.m_selectedInputs;
+    resultVec.clear();
+    // Make a copy
+    auto currentInputVec = inputVec;
+    // Sort the input data by descending order
+    std::sort(std::execution::par, currentInputVec.begin(), currentInputVec.end(),
+        [&](const UserData* a, const UserData* b) -> bool { return *a > *b; });
+
+    for (const auto* pTarget : targetVec)
+    {
+        if (currentInputVec.empty())
+            break;
+
+        std::uint64_t closestCombIndices = 0;
+        if (!Algorithms::FindSumToTargetBackTracking(
+                currentInputVec, pTarget, resultList.m_unitScale, errorStr, &closestCombIndices))
+            return false;
+
+        // After get the opt, we config the result.
+        auto& result = resultVec.emplace_back();
+        ConfigResultData(currentInputVec, closestCombIndices, pTarget, result, errorStr);
 
         // Remove elements from inputVec that has been picked by current result.
-        auto& combination = result.m_combination;
+        const auto& combination = result.m_combination;
         currentInputVec.erase(std::remove_if(currentInputVec.begin(), currentInputVec.end(),
                                   [&](auto& inputData) {
                                       return std::find(combination.begin(), combination.end(),
@@ -400,9 +539,10 @@ bool SolutionBestOfEachTarget(const std::vector<const UserData*>& inputVec,
             currentInputVec.end());
     }
 
+    resultList.m_remainInputs.clear();
     if (!resultVec.empty())
     {
-        auto& lastResult = resultVec.back();
+        const auto& lastResult = resultVec.back();
         if (lastResult.isFinished())
         {
             // Copy reamin inputs
@@ -420,47 +560,30 @@ bool SolutionBestOfEachTarget(const std::vector<const UserData*>& inputVec,
         }
     }
 
-    // Check if every target's calculation is finished.
-    for (int i = 0; i < resultVec.size(); ++i)
-    {
-        auto& result = resultVec[i];
-
-        // The last one can be unfinished.
-        if (i < resultVec.size() - 1)
-        {
-            if (!result.isFinished())
-            {
-                errorStr += "Every target's calculation needs to be finished!\n";
-                assert(false);
-                return false;
-            }
-        }
-    }
-
-    // Sum all results
-    resultList.m_combiSum  = 0;
-    resultList.m_remainSum = 0;
-    resultList.m_exeedSum  = 0;
-    for (auto& result : resultList.m_list)
-    {
-        resultList.m_combiSum += result.m_sum;
-
-        if (result.m_isExceeded)
-            resultList.m_exeedSum += result.m_difference;
-        else
-            resultList.m_remainSum += result.m_difference;
-    }
-
-    return true;
+    return ConfigResultListByResults(resultList, errorStr);
 }
-
 
 // TODO: Need research to find out a better algorithm. Such as A* path finding or simple Dijkstra.
 bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
     const std::vector<const UserData*>& targetVec, ResultDataList& resultList,
     std::string& errorStr)
 {
-    auto& resultVec       = resultList.m_list;
+    // Get the referenced solution result.
+    std::uint32_t refMaxNumFinishedTarget = 0;
+    float refMinExeedSum                  = 0.0f;
+    {
+        if (!SolutionBestOfEachTarget(inputVec, targetVec, resultList, errorStr))
+            return false;
+
+        // We only need to calculate futher if m_numfinished of resultList is greater than 1
+        if (resultList.m_numfinished <= 1)
+            return true;
+
+        refMaxNumFinishedTarget = resultList.m_numfinished;
+        refMinExeedSum =
+            static_cast<float>(static_cast<double>(resultList.m_exeedSum) / resultList.m_unitScale);
+    }
+
     const auto targetSize = targetVec.size();
     const auto inputSize  = inputVec.size();
 
@@ -477,7 +600,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
         [&](const UserData* a, const UserData* b) -> bool { return *a > *b; });
 
     // Fistly, get all possible combinations of each target.
-    std::vector<std::vector<Algorithms::Combination>> allCombVec(targetSize);
+    std::vector<std::vector<Algorithms::OutputCombination>> allCombVec(targetSize);
     {
         // Make error handling thread safe
         std::vector<std::string> allErrorStrVec(targetSize);
@@ -491,16 +614,10 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
         // Parallel for each
         std::for_each(std::execution::par_unseq, targetIndices.begin(), targetIndices.end(),
             [&](int targetIndex) {
-#ifdef M_DEBUG
-                std::stringstream msg;
-                msg << "Currently processing: " << targetIndex << std::endl;
-                std::cout << msg.str();
-#endif // M_DEBUG
-
                 hasError = hasError ||
                     !Algorithms::FindSumToTargetBackTracking(orderedInputVec,
                         targetVec[targetIndex], resultList.m_unitScale, allErrorStrVec[targetIndex],
-                        allCombVec[targetIndex], nullptr);
+                        nullptr, &allCombVec[targetIndex]);
             });
 
         // Sync the error results
@@ -517,69 +634,196 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
         }
     }
 
-    std::size_t pathSize = 0;
     // Secondly, walk through all combs to find the best result
+#ifdef M_DEBUG
+    std::atomic<std::size_t> pathSize = 0;
+#endif // M_DEBUG
+
+    std::vector<std::uint32_t> bestIndicesResult;
+    constexpr auto kInvalidIndex = GetInvalidValue(sizeof(std::uint32_t) * 8);
+    std::mutex recordResultMutex;
+
+    // Config max picked table by removing the bits from left most to match number of inputs
+    const auto maxPickedIndices = Algorithms::GetMaxPickedIndices(inputSize);
+
     if (!allCombVec.empty())
     {
-        struct Path
-        {
-            std::uint64_t level = 0;
-        };
-        Path bestPath;
+        // All combs Traversal, from combs of first target for parallel execution.
+        auto& firstCombVec = allCombVec.front();
 
-        // Config max picked table by removing the bits from left most to match number of inputs
-        auto maxPickedIndices = std::numeric_limits<std::uint64_t>::max();
-        {
-            auto numBitsToRemove = MAX_INPUT_SIZE - inputSize;
-            maxPickedIndices >>= numBitsToRemove;
-        }
+        // Upper bound returns the right most index of comb that has diff greater than
+        // refMinExeedSum, which we don't need to calculate anymore.
+        auto endIndexFirstComb =
+            std::upper_bound(firstCombVec.begin(), firstCombVec.end(), refMinExeedSum,
+                [](float minSum, const Algorithms::OutputCombination& comb) -> bool {
+                    return comb.diff > minSum;
+                }) -
+            firstCombVec.begin();
 
-        std::vector<int> stackIndexResult(targetSize);
-        std::function<void(std::uint64_t, int)> walkRecursion = [&](std::uint64_t pickedIndices,
-                                                                    int targetIndex) -> void {
-            // We reached the end of the path
-            if (pickedIndices == maxPickedIndices || targetIndex >= targetSize)
-            {
-                //if(targetIndex >= targetSize)
-                    //std::cout << pickedIndices << std::endl;
-                ++pathSize;
-                return;
-            }
+        // Gen indices, as we need index in std::for_each
+        std::vector<std::uint32_t> firstCombIndices;
+        firstCombIndices.reserve(endIndexFirstComb);
+        for (auto i = 0; i < endIndexFirstComb; ++i)
+            firstCombIndices.emplace_back(i);
 
-            auto& currentCombVec = allCombVec[targetIndex];
-            auto currentCombSize = currentCombVec.size();
-            for (int i = 0; i < currentCombSize; ++i)
-            {
-                auto& currentComb = currentCombVec[i];
-                auto currentPickedIndices = pickedIndices;
+        std::for_each(std::execution::par, firstCombIndices.begin(), firstCombIndices.end(),
+            [&](auto& index) -> void {
+                // Avoid to copy vector, we use a stack vector to store results
+                std::vector<std::uint32_t> stackIndexResult(targetSize);
 
+                // Invalidate all indices of stackIndexResult
+                std::fill(stackIndexResult.begin(), stackIndexResult.end(), kInvalidIndex);
 
-                auto combIndices  = ~currentComb.bitFlag;
+                auto outputPath = [&](std::uint32_t maxNumFinishedTarget, float exeedSum) -> void {
+                    bool needToRecord = maxNumFinishedTarget > refMaxNumFinishedTarget ||
+                        (exeedSum < refMinExeedSum &&
+                            maxNumFinishedTarget >= refMaxNumFinishedTarget);
 
-                // Remove unused bits.
-                combIndices &= maxPickedIndices;
+                    if (needToRecord)
+                    {
+                        std::lock_guard lock(recordResultMutex);
+                        refMaxNumFinishedTarget = maxNumFinishedTarget;
+                        refMinExeedSum          = exeedSum;
 
-                // Skip already picked indices.
-                if ((currentPickedIndices & combIndices) != 0)
-                    continue;
+                        bestIndicesResult = stackIndexResult;
+                    }
+#ifdef M_DEBUG
+                    ++pathSize;
+#endif // M_DEBUG
+                };
 
-                // Mark current indices as picked.
-                currentPickedIndices |= combIndices;
+                auto walkRecursion = LambdaCombinator([&](auto& selfLambda,
+                                                          std::uint64_t pickedIndices,
+                                                          std::uint32_t targetIndex,
+                                                          float prevExeed) -> void {
+                    // We reached the end of the tree
+                    if (pickedIndices == maxPickedIndices || targetIndex >= targetSize)
+                    {
+                        outputPath(targetIndex, prevExeed);
+                        return;
+                    }
 
-                // Save current result.
-                stackIndexResult[targetIndex] = i;
+                    const auto& currentCombVec = allCombVec[targetIndex];
+                    // Skip if exeed sum already greater than the sum of previous full path.
+                    auto endCombIndex =
+                        std::upper_bound(currentCombVec.begin(), currentCombVec.end(), prevExeed,
+                            [&](float prevSum, const Algorithms::OutputCombination& comb) -> bool {
+                                return comb.diff + prevSum > refMinExeedSum;
+                            }) -
+                        currentCombVec.begin();
 
-                walkRecursion(currentPickedIndices, targetIndex + 1);
+                    bool picked = false;
+                    for (std::uint32_t i = 0; i < endCombIndex; ++i)
+                    {
+                        auto& currentComb = currentCombVec[i];
 
-                // Reset current result.
-                stackIndexResult[targetIndex] = 0;
-            }
-        };
+                        // Skip already picked indices and comb that can not finish the target
+                        if ((pickedIndices & currentComb.selectedIndices) != 0 ||
+                            currentComb.diff < 0.0f)
+                            continue;
 
-        walkRecursion(0, 0);
+                        // Save current result.
+                        stackIndexResult[targetIndex] = i;
+                        picked                        = true;
+
+                        selfLambda(pickedIndices | currentComb.selectedIndices, targetIndex + 1,
+                            prevExeed + currentComb.diff);
+
+                        // Reset current result.
+                        stackIndexResult[targetIndex] = kInvalidIndex;
+                    }
+
+                    if (!picked)
+                    {
+                        outputPath(targetIndex, prevExeed);
+                    }
+                });
+
+                // Pick the indices of each comb from first comb vec.
+                auto& comb = firstCombVec[index];
+                if (comb.diff < refMinExeedSum)
+                {
+                    stackIndexResult[0] = index;
+                    walkRecursion(comb.selectedIndices, 1, comb.diff);
+                }
+            });
     }
 
-    return true;
+#ifdef M_DEBUG
+    std::cout << "Total number of path: " << pathSize << std::endl;
+#endif // M_DEBUG
+
+    // If did not find any path that is better then ref solution we out put the ref result.
+    if (bestIndicesResult.empty())
+        return true;
+
+    // Finally, we output the results to resultList.
+    {
+        auto& resultVec = resultList.m_selectedInputs;
+        resultVec.clear();
+        resultList.m_remainInputs.clear();
+
+        // Config all finished targets.
+        std::uint64_t allPickedIndices = 0;
+        for (std::uint32_t targetIndex = 0; targetIndex < targetSize; ++targetIndex)
+        {
+            const auto& currentCombsVec = allCombVec[targetIndex];
+            const auto& pCurrentTarget  = targetVec[targetIndex];
+            const auto indexOfCombsVec  = bestIndicesResult[targetIndex];
+
+            // We reached the end of the finished target.
+            if (targetIndex >= refMaxNumFinishedTarget)
+            {
+                // Check if we made anything wrong with recursion.
+                if (indexOfCombsVec != kInvalidIndex)
+                {
+                    errorStr += "Invalid bestIndicesResult\n";
+                    assert(false);
+                    return false;
+                }
+
+                // Check if there is any input remians.
+                if (allPickedIndices != maxPickedIndices)
+                {
+                    // Put all remian indices to a new result
+                    std::uint64_t remainIndices = allPickedIndices ^ maxPickedIndices;
+                    auto& result                = resultVec.emplace_back();
+                    ConfigResultData(
+                        orderedInputVec, remainIndices, pCurrentTarget, result, errorStr);
+                }
+
+                break;
+            }
+
+            // Now the index of combs vec should be valid
+            if (indexOfCombsVec == kInvalidIndex)
+            {
+                errorStr += "Invalid indexOfCombsVec\n";
+                assert(false);
+                return false;
+            }
+
+            const auto& currentSelectedComb = currentCombsVec[indexOfCombsVec];
+            auto currentSelectedIndices     = currentSelectedComb.selectedIndices;
+
+            // Append selected indices.
+            allPickedIndices |= currentSelectedIndices;
+            auto& result = resultVec.emplace_back();
+            ConfigResultData(
+                orderedInputVec, currentSelectedIndices, pCurrentTarget, result, errorStr);
+        }
+
+        // Still has reamins, that means all targets are finished.
+        if (allPickedIndices != maxPickedIndices)
+        {
+            std::uint64_t remainIndices = allPickedIndices ^ maxPickedIndices;
+
+            ParseIndicesToUserData(orderedInputVec, remainIndices,
+                [&](const UserData* pData) { resultList.m_remainInputs.emplace_back(pData); });
+        }
+    }
+
+    return ConfigResultListByResults(resultList, errorStr);
 }
 } // namespace Solutions
 } // namespace
@@ -606,8 +850,6 @@ bool Calculator::LoadTargetData(const char* fileName)
 bool Calculator::Run(ResultDataList& resultList, std::string& errorStr, Solution solution)
 {
     // Init result list
-    auto& resultVec = resultList.m_list;
-    resultVec.clear();
     resultList.m_unitScale = m_unitScale;
 
     // Init input vector of pointers, avoid extra copies

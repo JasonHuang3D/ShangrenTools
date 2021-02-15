@@ -36,7 +36,7 @@ if (MSVC)
     target_compile_options(build_settings INTERFACE "$<$<CONFIG:RELWITHDEBINFO>:${MSVC_RELWITHDEBINFO_COMPILE_OPTIONS}>")
 
     set(DEBUG_MACROS M_DEBUG)
-    target_compile_definitions(build_settings INTERFACE "$<$<CONFIG:DEBUG>:${DEBUG_MACROS}>")
+    target_compile_definitions(build_settings INTERFACE "$<$<CONFIG:DEBUG>:${DEBUG_MACROS}>" "$<$<CONFIG:RELWITHDEBINFO>:${DEBUG_MACROS}>" )
 else()
     # TODO: The following need testing in MAC OS 
 endif()

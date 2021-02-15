@@ -76,7 +76,10 @@ std::string GetBinaryStrFromInt(T value)
 struct ArrayHelper
 {
     // A generator for bit mask
-    static constexpr std::uint64_t BitMaskGenerator(std::size_t index) { return 1ll << index; };
+    static constexpr std::uint64_t BitMaskGenerator(std::size_t index) { return 1ull << index; };
+
+    // A generator for index
+    static constexpr std::uint64_t IndexGenerator(std::size_t index) { return index; };
 
     // Helper function to create an array with init values at compile time
     template <typename T, std::size_t N>
@@ -93,5 +96,24 @@ private:
         return std::array<T, sizeof...(I)> { generator(I)... };
     }
 };
+
+// Helper to create recursive lambda
+template <typename T>
+struct LambdaCombinator
+{
+    LambdaCombinator(T lambda) :lambda(lambda) {}
+
+    template <class... TArgs>
+    decltype(auto) operator()(TArgs&&... args) const
+    {
+        // We pass ourselves to lambda, then the arguments.
+        return lambda(*this, std::forward<TArgs>(args)...);
+    }
+
+    T lambda;
+};
+// C++17 Class Type Decution Guide
+template <class T>
+LambdaCombinator(T) -> LambdaCombinator<T>;
 
 } // namespace JUtils

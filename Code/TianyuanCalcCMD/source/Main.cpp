@@ -67,8 +67,8 @@ void GetCurrentState(State& outState)
         outState.calcSolution = Calculator::Solution::BestOfEachTarget;
         break;
     case 'o':
-        //outState.appState     = AppState::Calculating;
-        //outState.calcSolution = Calculator::Solution::OverallBest;
+        outState.appState     = AppState::Calculating;
+        outState.calcSolution = Calculator::Solution::OverallBest;
         break;
     case 'q':
         outState.appState = AppState::Exit;
@@ -85,7 +85,7 @@ void GetCurrentState(State& outState)
 
 int main(int argc, char* argv[])
 {
-#if defined(WIN32) && defined(M_DEBUG)
+#if defined(WIN32) && defined(_DEBUG)
     // Detecting memory leaks using CRT dbg
     ::_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
@@ -130,10 +130,18 @@ int main(int argc, char* argv[])
                 break;
             }
 
+            // Print a warning of choosing best overall solution
+            if (currentState.calcSolution == Calculator::Solution::OverallBest)
+            {
+                std::cout << u8"已选择全局最优方案, 如时间太长, 请减少 InputData.txt 和 "
+                             u8"targetData.txt 的数量. "
+                          << std::endl;
+            }
+
             // Print input out put size
             auto inputSize  = calculator.GetInputDataVec().GetList().size();
             auto targetSize = calculator.GetTargetDataVec().GetList().size();
-            std::cout << u8"需要计算: " << inputSize << u8"个仙人, " << targetSize << u8"个目标"
+            std::cout << u8"需要计算: " << inputSize << u8"个仙人, " << targetSize << u8"个目标."
                       << std::endl;
 
             // Run
@@ -147,7 +155,7 @@ int main(int argc, char* argv[])
                 std::cout << u8"计算结果:" << std::endl;
                 PrintLargeSpace();
 
-                auto& resultVec = resultList.m_list;
+                auto& resultVec = resultList.m_selectedInputs;
                 for (int i = 0; i < resultVec.size(); ++i)
                 {
                     auto& result = resultVec[i];
@@ -186,6 +194,7 @@ int main(int argc, char* argv[])
                 std::cout << u8"统计:" << std::endl;
                 PrintSmallSpace();
 
+                std::cout << u8"总共完成: " << resultList.m_numfinished << u8" 个目标" << std::endl;
                 std::cout << u8"战力总计: "
                           << FormatIntToFloat<double>(resultList.m_combiSum, resultList.m_unitScale)
                           << unitStr << std::endl;
@@ -197,19 +206,12 @@ int main(int argc, char* argv[])
                                  resultList.m_remainSum, resultList.m_unitScale)
                           << unitStr << std::endl;
 
-                std::cout << u8"剩余仙人: " << std::endl;
-                auto& remainInputs = resultList.m_remainInputs;
-                if (remainInputs.empty())
+                const auto& remainInputs = resultList.m_remainInputs;
+                std::cout << u8"剩余仙人: " << remainInputs.size() << u8"个" << std::endl;
+                for (int i = 0; i < remainInputs.size(); ++i)
                 {
-                    std::cout << u8"无" << std::endl;
-                }
-                else
-                {
-                    for (int i = 0; i < remainInputs.size(); ++i)
-                    {
-                        auto& userData = remainInputs[i];
-                        PrintInputData(i + 1, userData, resultList.m_unitScale);
-                    }
+                    auto& userData = remainInputs[i];
+                    PrintInputData(i + 1, userData, resultList.m_unitScale);
                 }
 
                 PrintLargeSpace();
