@@ -70,13 +70,16 @@ public:
     bool operator==(const UserData& rhs) const { return m_data == rhs.m_data; }
 
     const char* GetDesc() const { return m_desc.c_str(); }
-    std::uint64_t GetData() const { return m_data; }
+    std::uint64_t GetOriginalData() const { return m_data; }
+    std::uint64_t GetFixedData() const { return m_data + m_offset; }
 
+public:
+    mutable int m_offset = 0;
 private:
     std::string m_desc;
 
     // Raw data without any scale
-    std::uint64_t m_data;
+    std::uint64_t m_data = 0;
 };
 
 class UserDataList

@@ -50,7 +50,7 @@ void PrintInputData(std::uint32_t printIndex, const UserData* pUserData, std::ui
         return;
 
     std::cout << u8"仙人" << printIndex << ": " << pUserData->GetDesc() << u8", 战力:"
-              << FormatIntToFloat<double>(pUserData->GetData(), unitScale)
+              << FormatIntToFloat<double>(pUserData->GetOriginalData(), unitScale)
               << UnitScale::GetUnitStr(unitScale) << std::endl;
 }
 void GetCurrentState(State& outState)
@@ -167,7 +167,7 @@ int main(int argc, char* argv[])
                     std::cout << u8"目标" << i + 1 << ": " << result.m_pTarget->GetDesc()
                               << u8", 需求: "
                               << FormatIntToFloat<double>(
-                                     result.m_pTarget->GetData(), resultList.m_unitScale)
+                                     result.m_pTarget->GetOriginalData(), resultList.m_unitScale)
                               << u8",计算结果为: " << std::endl;
                     PrintSmallSpace();
 

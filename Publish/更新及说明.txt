@@ -27,4 +27,6 @@
             1）按t可以使用这个算法。
             2）如果运行时间过长请调整inputData.txt和targetData.txt里的条目数。条目数越多越慢。
         -优化输出内容，增加计算耗时统计。
-        -改用Release取代MinSizeRel，从而提高性能。 
+        -改用Release取代MinSizeRel，从而提高性能。
+    2021.2.17
+        -大幅优化T模式性能，inputData.txt尽量不要放小于目标太多的条目数。

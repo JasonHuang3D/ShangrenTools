@@ -42,7 +42,7 @@ TypeFloat FormatIntToFloat(TypeInt value, TypeInt scale)
 // Invalid value of every possible bits
 constexpr std::uint32_t GetInvalidValue(std::uint32_t numBits)
 {
-    return static_cast<std::uint32_t>((1LL << numBits) - 1);
+    return static_cast<std::uint32_t>((1ULL<< numBits) - 1);
 }
 
 // Helper function to compute and combine hash value
