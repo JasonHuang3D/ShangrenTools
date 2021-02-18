@@ -15,7 +15,10 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "ThreadUtils/pool.hpp"
+
 #define USE_REMOVE_DUPLICATES true
+#define USE_STD_PAR_FOR_OVERALL_SOLUTION false
 
 namespace
 {
@@ -23,162 +26,6 @@ using namespace JUtils;
 
 namespace Algorithms
 {
-// Time Complexity O(N), TODO: check the algorithm carefully. Currently it produce wrong result
-// depends on input order.
-void FindClosestSumToTargetON(const std::vector<const UserData*>& inputVec, const UserData* pTarget,
-    ResultData& outResult, bool forceGreaterEq = false)
-{
-    assert(pTarget);
-
-    auto targetValue = pTarget->GetOriginalData();
-    int inputSize    = static_cast<int>(inputVec.size());
-
-    struct WindowResult
-    {
-        WindowResult(int leftIndex, int rightIndex, std::uint64_t sum, bool isGreaterEqual) :
-            m_leftIndex(leftIndex),
-            m_rightIndex(rightIndex),
-            m_difference(sum),
-            m_isGreaterEqual(isGreaterEqual)
-        {
-        }
-        int m_leftIndex            = 0;
-        int m_rightIndex           = 0;
-        std::uint64_t m_difference = 0;
-        bool m_isGreaterEqual      = false;
-        bool isInit                = false;
-    };
-
-    std::uint64_t currentSum = 0;
-    std::uint64_t prevDiff = std::numeric_limits<std::uint64_t>::max(), currentDiff = 0;
-    bool currentSign = false, prevSign = false;
-
-    int leftIndex = 0, rightIndex = 0;
-
-    WindowResult result(leftIndex, rightIndex, std::numeric_limits<std::uint64_t>::max(), false);
-    WindowResult resultTemp = result;
-    resultTemp.isInit       = true;
-
-    while (leftIndex <= rightIndex && rightIndex < inputSize)
-    {
-        // Add last element
-        auto& inputData = inputVec[rightIndex];
-        currentSum += inputData->GetOriginalData();
-
-        // When the current sum exceeds target value
-        if (targetValue < currentSum)
-        {
-            // Calculate current difference
-            currentDiff = currentSum - targetValue;
-            currentSign = true;
-
-            if (currentDiff < prevDiff || (!prevSign && forceGreaterEq))
-            {
-                // Store result as current diff is better.
-                resultTemp.m_leftIndex      = leftIndex;
-                resultTemp.m_rightIndex     = rightIndex;
-                resultTemp.m_difference     = currentDiff;
-                resultTemp.m_isGreaterEqual = currentSign;
-
-                ++rightIndex;
-            }
-            else
-            {
-                // Store result as prev diff is better.
-                // prev index is right index -1;
-                resultTemp.m_leftIndex      = leftIndex;
-                resultTemp.m_rightIndex     = rightIndex - 1;
-                resultTemp.m_difference     = prevDiff;
-                resultTemp.m_isGreaterEqual = prevSign;
-
-                // In next iteration, left index increases
-                // but right index remains the same
-                // Update currentSum and leftIndex accordingly
-                auto toSub = inputVec[leftIndex]->GetOriginalData() +
-                    inputVec[rightIndex]->GetOriginalData();
-                assert(currentSum >= toSub);
-                currentSum -= toSub;
-
-                ++leftIndex;
-            }
-        }
-        else
-        {
-            // Calculate current difference
-            currentDiff = targetValue - currentSum;
-            currentSign = currentDiff == 0;
-
-            // When the current sum is still not enough, we increase the right index to try to add
-            // more elemenets.
-            resultTemp.m_leftIndex      = leftIndex;
-            resultTemp.m_rightIndex     = rightIndex;
-            resultTemp.m_difference     = currentDiff;
-            resultTemp.m_isGreaterEqual = currentSign;
-
-            ++rightIndex;
-        }
-
-        // For every end of each iterations, we compare the result against the temp result to get
-        // the optimal result.
-        if (resultTemp.m_difference < result.m_difference)
-        {
-            if (!forceGreaterEq || (forceGreaterEq && resultTemp.m_isGreaterEqual))
-            {
-                result = resultTemp;
-            }
-        }
-
-        // Save difference of previous iteration
-        prevDiff = currentDiff;
-        prevSign = currentSign;
-    }
-
-    // After getting the best result window, we config the out put using indices of result.
-    outResult.m_pTarget = pTarget;
-
-    bool resultNotFound = !result.isInit;
-
-    int startIndex = result.m_leftIndex, endIndex = result.m_rightIndex;
-    if (resultNotFound)
-    {
-        // If not found, we simply copy the input list if it's not empty.
-        startIndex = 0;
-        endIndex   = inputSize - 1;
-        if (endIndex < 0)
-            endIndex = 0;
-    }
-
-    // Calculate the sum again, to make sure the result is correct.
-    outResult.m_sum = 0;
-    for (int i = startIndex; i <= endIndex && inputSize > 0; ++i)
-    {
-        auto& data = inputVec[i];
-        outResult.m_sum += data->GetOriginalData();
-        outResult.m_combination.emplace_back(data);
-    }
-
-    outResult.m_isExceeded = outResult.m_sum > targetValue;
-
-    if (resultNotFound)
-    {
-        // Make sure the only reason of result not found is input sum is not enough to the target.
-        assert(targetValue > outResult.m_sum && !outResult.m_isExceeded);
-        outResult.m_difference = targetValue - outResult.m_sum;
-    }
-    else
-    {
-        outResult.m_difference = result.m_difference;
-
-        auto isCorrectSign = (result.m_isGreaterEqual && outResult.m_sum >= targetValue) ||
-            (!result.m_isGreaterEqual && outResult.m_sum < targetValue);
-        assert(isCorrectSign);
-
-        auto isCorrectValue = outResult.m_isExceeded
-            ? outResult.m_sum - result.m_difference == targetValue
-            : outResult.m_sum + result.m_difference == targetValue;
-        assert(isCorrectValue);
-    }
-}
 
 // Create our index bit mask at compile time
 constexpr auto k_inputIndexBitMask =
@@ -706,7 +553,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
             }
 
             // Small offset to add to the input to avoid duplicates.
-            int valueDiff = static_cast<int>(resultList.m_unitScale) / 1000;
+            int valueDiff = static_cast<int>(resultList.m_unitScale) / 100;
             for (auto& duplicate : duplicateVec)
             {
                 auto sizeOfRange = duplicate.endIndex - duplicate.startIndex;
@@ -727,21 +574,33 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
         std::vector<std::string> allErrorStrVec(targetSize);
         std::atomic<bool> hasError = false;
 
-        // Iterate indices rather than vector
-        std::vector<int> targetIndices(targetSize);
-        for (int i = 0; i < targetSize; ++i)
-            targetIndices[i] = i;
-
         static constexpr bool s_kUseHashTable = !USE_REMOVE_DUPLICATES;
 
-        // Parallel for each
-        std::for_each(std::execution::par_unseq, targetIndices.begin(), targetIndices.end(),
-            [&](int targetIndex) {
-                hasError = hasError ||
-                    !Algorithms::FindSumToTargetBackTracking<s_kUseHashTable>(orderedInputVec,
-                        targetVec[targetIndex], resultList.m_unitScale, allErrorStrVec[targetIndex],
-                        nullptr, &allCombVec[targetIndex], &refMinExeedSum);
-            });
+        auto taskFunc = [&](std::uint32_t targetIndex) {
+            hasError = hasError ||
+                !Algorithms::FindSumToTargetBackTracking<s_kUseHashTable>(orderedInputVec,
+                    targetVec[targetIndex], resultList.m_unitScale, allErrorStrVec[targetIndex],
+                    nullptr, &allCombVec[targetIndex], &refMinExeedSum);
+        };
+
+#if USE_STD_PAR_FOR_OVERALL_SOLUTION
+        {
+            // Iterate indices rather than vector
+            std::vector<std::uint32_t> targetIndices(targetSize);
+            for (std::uint32_t i = 0; i < targetSize; ++i)
+                targetIndices[i] = i;
+            std::for_each(std::execution::par_unseq, targetIndices.begin(), targetIndices.end(),
+                taskFunc);
+        }
+#else
+        {
+            ThreadUtils::thread_pool threadPool;
+            for (std::uint32_t i = 0; i < targetSize; ++i)
+            {
+                threadPool.enqueue_work(taskFunc, i);
+            }
+        }
+#endif
 
         // Sync the error results
         if (hasError)
@@ -774,51 +633,33 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
         // All combs Traversal, from combs of first target for parallel execution.
         auto& firstCombVec = allCombVec.front();
 
-        // Upper bound returns the right most index of comb that has diff greater than
-        // refMinExeedSum, which we don't need to calculate anymore.
-        auto endIndexFirstComb =
-            std::upper_bound(firstCombVec.begin(), firstCombVec.end(), refMinExeedSum,
-                [](float minSum, const Algorithms::OutputCombination& comb) -> bool {
-                    return comb.diff > minSum;
-                }) -
-            firstCombVec.begin();
+        auto taskFunc = [&](auto& index) -> void {
+            // Avoid to copy vector, we use a stack vector to store results
+            std::vector<std::uint32_t> stackIndexResult(targetSize);
 
-        // Gen indices, as we need index in std::for_each
-        std::vector<std::uint32_t> firstCombIndices;
-        firstCombIndices.reserve(endIndexFirstComb);
-        for (auto i = 0; i < endIndexFirstComb; ++i)
-            firstCombIndices.emplace_back(i);
+            // Invalidate all indices of stackIndexResult
+            std::fill(stackIndexResult.begin(), stackIndexResult.end(), kInvalidIndex);
 
-        std::for_each(std::execution::par, firstCombIndices.begin(), firstCombIndices.end(),
-            [&](auto& index) -> void {
-                // Avoid to copy vector, we use a stack vector to store results
-                std::vector<std::uint32_t> stackIndexResult(targetSize);
+            auto outputPath = [&](std::uint32_t maxNumFinishedTarget, float exeedSum) -> void {
+                bool needToRecord = maxNumFinishedTarget > refMaxNumFinishedTarget ||
+                    (exeedSum < refMinExeedSum && maxNumFinishedTarget >= refMaxNumFinishedTarget);
 
-                // Invalidate all indices of stackIndexResult
-                std::fill(stackIndexResult.begin(), stackIndexResult.end(), kInvalidIndex);
+                if (needToRecord)
+                {
+                    std::lock_guard lock(recordResultMutex);
+                    refMaxNumFinishedTarget = maxNumFinishedTarget;
+                    refMinExeedSum          = exeedSum;
 
-                auto outputPath = [&](std::uint32_t maxNumFinishedTarget, float exeedSum) -> void {
-                    bool needToRecord = maxNumFinishedTarget > refMaxNumFinishedTarget ||
-                        (exeedSum < refMinExeedSum &&
-                            maxNumFinishedTarget >= refMaxNumFinishedTarget);
-
-                    if (needToRecord)
-                    {
-                        std::lock_guard lock(recordResultMutex);
-                        refMaxNumFinishedTarget = maxNumFinishedTarget;
-                        refMinExeedSum          = exeedSum;
-
-                        bestIndicesResult = stackIndexResult;
-                    }
+                    bestIndicesResult = stackIndexResult;
+                }
 #ifdef M_DEBUG
-                    ++pathSize;
+                ++pathSize;
 #endif // M_DEBUG
-                };
+            };
 
-                auto walkRecursion = LambdaCombinator([&](auto& selfLambda,
-                                                          std::uint64_t pickedIndices,
-                                                          std::uint32_t targetIndex,
-                                                          float prevExeed) -> void {
+            auto walkRecursion =
+                LambdaCombinator([&](auto& selfLambda, std::uint64_t pickedIndices,
+                                     std::uint32_t targetIndex, float prevExeed) -> void {
                     // We reached the end of the tree
                     if (pickedIndices == maxPickedIndices || targetIndex >= targetSize)
                     {
@@ -829,7 +670,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
                     {
 
                         // At this point, we still have unpicked indices and still have targets to
-                        // finish.
+                        // finish. and num finished target might be greater
 
                         // We make a prediction to see remianing indices are enough to finish this
                         // target.
@@ -865,6 +706,18 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
                             refMaxNumFinishedTarget = targetIndex;
 
                             refMinExeedSum = prevExeed + fSum;
+                        }
+                    }
+                    else
+                    {
+                        // At this point, we still have unpicked indices and still have targets to
+                        // finish. But num finished target can not be greater.
+
+                        // We check prevExeed to see if we can skip
+                        if (prevExeed > refMinExeedSum)
+                        {
+                            outputPath(targetIndex, prevExeed);
+                            return;
                         }
                     }
 
@@ -904,14 +757,40 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
                     }
                 });
 
-                // Pick the indices of each comb from first comb vec.
-                auto& comb = firstCombVec[index];
-                if (comb.diff < refMinExeedSum)
-                {
-                    stackIndexResult[0] = index;
-                    walkRecursion(comb.selectedIndices, 1, comb.diff);
-                }
-            });
+            // Pick the indices of each comb from first comb vec.
+            auto& comb = firstCombVec[index];
+            if (comb.diff < refMinExeedSum)
+            {
+                stackIndexResult[0] = index;
+                walkRecursion(comb.selectedIndices, 1, comb.diff);
+            }
+        };
+
+        // Upper bound returns the right most index of comb that has diff greater than
+        // refMinExeedSum, which we don't need to calculate anymore.
+        auto endIndexFirstComb = static_cast<std::uint32_t>(
+            firstCombVec.size());
+
+#if USE_STD_PAR_FOR_OVERALL_SOLUTION
+        {
+            // Gen indices, as we need index in std::for_each
+            std::vector<std::uint32_t> firstCombIndices;
+            firstCombIndices.reserve(endIndexFirstComb);
+            for (std::uint32_t i = 0; i < endIndexFirstComb; ++i)
+                firstCombIndices.emplace_back(i);
+
+            std::for_each(
+                std::execution::par, firstCombIndices.begin(), firstCombIndices.end(), taskFunc);
+        }
+#else
+        {
+            ThreadUtils::thread_pool threadPool;
+            for (std::uint32_t i = 0; i < endIndexFirstComb; ++i)
+            {
+                threadPool.enqueue_work(taskFunc, i);
+            }
+        }
+#endif // USE_STD_PAR_FOR_OVERALL_SOLUTION
     }
 
 #ifdef M_DEBUG

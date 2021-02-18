@@ -226,7 +226,7 @@ int main(int argc, char* argv[])
             }
 
             std::cout << std::setprecision(3);
-            std::cout << u8"计算时长: " << timeSpent << " 秒"<<std::endl;
+            std::cout << u8"计算时长: " << timeSpent << " 秒" << std::endl;
             std::cout << std::setprecision(MAX_FRACTION_DIGITS_TO_PRINT);
             PrintLargeSpace();
             break;

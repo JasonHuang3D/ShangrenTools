@@ -2,13 +2,12 @@
 set(app_target_name TianyuanCalcCMD)
 
 # set the source files to compile
-file(GLOB file_source
-source/*.h
-source/*.cpp
+file(GLOB_RECURSE file_source "Src/*.h" "Src/*.cpp" "Src/*.hpp"
 
 ${CMAKE_CURRENT_SOURCE_DIR}/config.txt
 ${CMAKE_CURRENT_SOURCE_DIR}/inputData.txt
 ${CMAKE_CURRENT_SOURCE_DIR}/targetData.txt
+
 )
 # Add to source group, TREE will enable cmake to config the folder layout automatically 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${file_source})

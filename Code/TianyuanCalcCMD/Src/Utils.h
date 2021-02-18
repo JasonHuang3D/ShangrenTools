@@ -9,6 +9,14 @@
 #include <string>
 #include <vector>
 
+#include <condition_variable>
+#include <future>
+#include <memory>
+#include <mutex>
+#include <queue>
+#include <thread>
+#include <type_traits>
+
 namespace JUtils
 {
 // Accepts std::string std::wstring, etc.
@@ -42,7 +50,7 @@ TypeFloat FormatIntToFloat(TypeInt value, TypeInt scale)
 // Invalid value of every possible bits
 constexpr std::uint32_t GetInvalidValue(std::uint32_t numBits)
 {
-    return static_cast<std::uint32_t>((1ULL<< numBits) - 1);
+    return static_cast<std::uint32_t>((1ULL << numBits) - 1);
 }
 
 // Helper function to compute and combine hash value
@@ -138,4 +146,5 @@ private:
     std::chrono::high_resolution_clock m_clock;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_t0;
 };
+
 } // namespace JUtils
