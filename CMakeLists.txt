@@ -99,6 +99,8 @@ function(add_app APP_NAME IDE_FOLDER WINDOWED SOURCE ASSETS RESFILES)
 endfunction()
 #====================End Helper functions===========================================#
 
+add_subdirectory(ThirdParty)
+
 add_subdirectory(Code)
 
 # Config visual studio default startup project

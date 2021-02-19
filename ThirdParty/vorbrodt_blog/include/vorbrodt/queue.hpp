@@ -10,7 +10,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace ThreadUtils
+namespace vorbrodt
 {
 template <typename T>
 class blocking_queue
@@ -749,4 +749,4 @@ private:
     semaphore m_openSlots;
     semaphore m_fullSlots;
 };
-} // namespace ThreadUtils
+} // namespace vorbrodt

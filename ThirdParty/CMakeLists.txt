@@ -1,4 +1,7 @@
 
 cmake_minimum_required (VERSION 3.14.7)
 
-add_subdirectory(nlohmannJson)
+set(JSON_BuildTests OFF)
+add_subdirectory(nlohmann_json)
+
+add_subdirectory(vorbrodt_blog)

@@ -15,10 +15,11 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "ThreadUtils/pool.hpp"
+#include "vorbrodt/pool.hpp"
 
 #define USE_REMOVE_DUPLICATES true
 #define USE_STD_PAR_FOR_OVERALL_SOLUTION false
+
 
 namespace
 {
@@ -594,7 +595,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
         }
 #else
         {
-            ThreadUtils::thread_pool threadPool;
+            vorbrodt::thread_pool threadPool;
             for (std::uint32_t i = 0; i < targetSize; ++i)
             {
                 threadPool.enqueue_work(taskFunc, i);
@@ -784,7 +785,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
         }
 #else
         {
-            ThreadUtils::thread_pool threadPool;
+            vorbrodt::thread_pool threadPool;
             for (std::uint32_t i = 0; i < endIndexFirstComb; ++i)
             {
                 threadPool.enqueue_work(taskFunc, i);

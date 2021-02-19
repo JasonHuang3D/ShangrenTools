@@ -10,7 +10,7 @@
 #include <condition_variable>
 #include <mutex>
 
-namespace ThreadUtils
+namespace vorbrodt
 {
 class semaphore
 {
@@ -91,4 +91,4 @@ private:
     std::atomic_int m_count;
     semaphore m_semaphore;
 };
-} // namespace ThreadUtils
+} // namespace vorbrodt

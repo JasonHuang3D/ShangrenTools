@@ -31,18 +31,18 @@ add_app(${app_target_name} "Tools" false "${file_source}" "${file_assets}" "${fi
 # Config includes
 target_include_directories(${app_target_name}
 PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/source
-    ${CMAKE_CURRENT_SOURCE_DIR}/resource
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src
 )
 
 # Config links
 target_link_libraries(${app_target_name} 
 PRIVATE
     build_settings
+    vorbrodt_blog
 )
 
 # Add target name
 target_compile_definitions(${app_target_name}
 PRIVATE
-    SAMPLE_APP_NAME="${app_target_name}"
+    APP_NAME="${app_target_name}"
 )

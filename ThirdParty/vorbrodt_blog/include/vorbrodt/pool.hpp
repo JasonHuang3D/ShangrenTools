@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-namespace ThreadUtils
+namespace vorbrodt
 {
 class thread_pool
 {
@@ -58,7 +58,6 @@ public:
                 return;
 
         m_queues[i % m_count].push(std::move(work));
-        
     }
 
     template <typename F, typename... Args>
@@ -97,4 +96,4 @@ private:
 
     inline static const unsigned int K = 2;
 };
-} // namespace ThreadUtils
+} // namespace vorbrodt
