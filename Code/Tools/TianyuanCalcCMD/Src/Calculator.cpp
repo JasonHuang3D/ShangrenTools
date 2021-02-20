@@ -2,10 +2,11 @@
 // Author: Jason Huang(jasonhuang1988@gmail.com) 2021
 //
 
-#include "pch.h"
+#include "JUtils/pch.h"
 
 #include "Calculator.h"
-#include "Utils.h"
+
+#include "JUtils/Utils.h"
 
 #include <bitset>
 #include <cmath>
@@ -20,10 +21,10 @@
 #define USE_REMOVE_DUPLICATES true
 #define USE_STD_PAR_FOR_OVERALL_SOLUTION false
 
-
 namespace
 {
 using namespace JUtils;
+using namespace TianyuanCalc;
 
 namespace Algorithms
 {
@@ -590,8 +591,8 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
             std::vector<std::uint32_t> targetIndices(targetSize);
             for (std::uint32_t i = 0; i < targetSize; ++i)
                 targetIndices[i] = i;
-            std::for_each(std::execution::par_unseq, targetIndices.begin(), targetIndices.end(),
-                taskFunc);
+            std::for_each(
+                std::execution::par_unseq, targetIndices.begin(), targetIndices.end(), taskFunc);
         }
 #else
         {
@@ -769,8 +770,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
 
         // Upper bound returns the right most index of comb that has diff greater than
         // refMinExeedSum, which we don't need to calculate anymore.
-        auto endIndexFirstComb = static_cast<std::uint32_t>(
-            firstCombVec.size());
+        auto endIndexFirstComb = static_cast<std::uint32_t>(firstCombVec.size());
 
 #if USE_STD_PAR_FOR_OVERALL_SOLUTION
         {
@@ -878,7 +878,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
 } // namespace Solutions
 } // namespace
 
-namespace JUtils
+namespace TianyuanCalc
 {
 bool Calculator::Init(UnitScale::Values unitScale)
 {
@@ -887,7 +887,7 @@ bool Calculator::Init(UnitScale::Values unitScale)
 
     return true;
 }
-bool JUtils::Calculator::LoadInputData(const char* fileName)
+bool Calculator::LoadInputData(const char* fileName)
 {
     return loadUserData(fileName, m_inputDataVec);
 }

@@ -2,10 +2,11 @@
 // Author: Jason Huang(jasonhuang1988@gmail.com) 2021
 //
 
-#include "pch.h"
+#include "JUtils/pch.h"
+
+#include "JUtils/Utils.h"
 
 #include "UserData.h"
-#include "Utils.h"
 
 #define MAX_FRACTION_DIGITS_TO_PRINT 2
 
@@ -21,6 +22,8 @@
 #endif // (WIN32) && defined (M_DEBUG)
 
 using namespace JUtils;
+using namespace TianyuanCalc;
+
 namespace
 {
 enum class AppState : std::uint8_t

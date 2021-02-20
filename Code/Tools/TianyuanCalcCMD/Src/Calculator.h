@@ -19,7 +19,7 @@
 #define MAX_COMB_NUM_BIT 32
 #endif // !MAX_COMB_NUM_BIT
 
-namespace JUtils
+namespace TianyuanCalc
 {
 
 class Calculator
@@ -43,7 +43,6 @@ public:
 
     bool Run(ResultDataList& resultList, std::string& errorStr, Solution solution);
 
-
     const UserDataList& GetInputDataVec() const { return m_inputDataVec; }
     const UserDataList& GetTargetDataVec() const { return m_targetDataList; }
 
@@ -56,4 +55,4 @@ private:
     std::uint64_t m_unitScale = UnitScale::k_10K;
 };
 
-} // namespace JUtils
+} // namespace TianyuanCalc

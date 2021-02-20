@@ -1,1 +1,3 @@
-add_subdirectory(TianyuanCalcCMD)
+
+add_subdirectory(FrameWorks)
+add_subdirectory(Tools)

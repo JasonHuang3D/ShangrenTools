@@ -7,15 +7,8 @@
 #include <chrono>
 #include <functional>
 #include <string>
-#include <vector>
-
-#include <condition_variable>
-#include <future>
-#include <memory>
-#include <mutex>
-#include <queue>
-#include <thread>
 #include <type_traits>
+#include <vector>
 
 namespace JUtils
 {
@@ -48,7 +41,7 @@ TypeFloat FormatIntToFloat(TypeInt value, TypeInt scale)
 }
 
 // Invalid value of every possible bits
-constexpr std::uint32_t GetInvalidValue(std::uint32_t numBits)
+inline constexpr std::uint32_t GetInvalidValue(std::uint32_t numBits)
 {
     return static_cast<std::uint32_t>((1ULL << numBits) - 1);
 }
@@ -128,21 +121,15 @@ LambdaCombinator(T) -> LambdaCombinator<T>;
 class Timer
 {
 public:
-    Timer() { Reset(); }
+    Timer();
     // Starts/resets the high resolution timer.
-    void Reset() { m_t0 = m_clock.now(); }
+    void Reset();
 
-    double DurationInSec() { return Elapsed() * 0.001; }
-    double DurationInMsec() { return Elapsed(); }
+    double DurationInSec();
+    double DurationInMsec();
 
 private:
-    double Elapsed() const
-    {
-        std::chrono::time_point<std::chrono::high_resolution_clock> t1 = m_clock.now();
-        std::chrono::milliseconds dt =
-            std::chrono::duration_cast<std::chrono::milliseconds>(t1 - m_t0);
-        return static_cast<double>(dt.count());
-    }
+    double Elapsed() const;
     std::chrono::high_resolution_clock m_clock;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_t0;
 };

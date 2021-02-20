@@ -2,16 +2,18 @@
 // Author: Jason Huang(jasonhuang1988@gmail.com) 2021
 //
 
-#include "pch.h"
+#include "JUtils/pch.h"
 
 #include "UserData.h"
+
+#include "JUtils/Utils.h"
 
 #include <fstream>
 #include <sstream>
 
-#include "Utils.h"
+using namespace JUtils;
 
-namespace JUtils
+namespace TianyuanCalc
 {
 
 bool UserDataList::ReadFromFile(
@@ -71,4 +73,4 @@ bool ResultData::isFinished() const
     else
         return m_isExceeded;
 }
-} // namespace JUtils
+} // namespace TianyuanCalc

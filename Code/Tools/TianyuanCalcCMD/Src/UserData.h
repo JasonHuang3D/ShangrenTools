@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace JUtils
+namespace TianyuanCalc
 {
 struct UnitScale
 {
@@ -75,6 +75,7 @@ public:
 
 public:
     mutable int m_offset = 0;
+
 private:
     std::string m_desc;
 
@@ -144,4 +145,4 @@ public:
     std::uint32_t m_numfinished = 0;
 };
 
-} // namespace JUtils
+} // namespace TianyuanCalc
