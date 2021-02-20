@@ -1,11 +1,8 @@
 # Set App target name
-set(app_target_name TianyuanCalcCMD)
+set(app_target_name GearCalcCMD)
 
 # set the source files to compile
 file(GLOB_RECURSE file_source "Src/*.h" "Src/*.cpp" "Src/*.hpp"
-
-${CMAKE_CURRENT_SOURCE_DIR}/inputData.txt
-${CMAKE_CURRENT_SOURCE_DIR}/targetData.txt
 
 )
 # Add to source group, TREE will enable cmake to config the folder layout automatically 
@@ -39,6 +36,7 @@ PRIVATE
     build_settings
     JUtils
     vorbrodt_blog
+    nlohmann_json
 )
 
 # Add target name
