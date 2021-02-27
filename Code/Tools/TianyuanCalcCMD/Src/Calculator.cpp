@@ -18,7 +18,7 @@
 
 #include "vorbrodt/pool.hpp"
 
-#define USE_REMOVE_DUPLICATES true
+#define USE_REMOVE_DUPLICATES false
 #define USE_STD_PAR_FOR_OVERALL_SOLUTION false
 
 namespace
@@ -500,14 +500,50 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
             static_cast<float>(static_cast<double>(resultList.m_exeedSum) / resultList.m_unitScale);
     }
 
-    const auto targetSize = targetVec.size();
-    const auto inputSize  = inputVec.size();
+    const auto originalTargetSize = targetVec.size();
+    const auto inputSize          = inputVec.size();
     if (inputSize == 0)
     {
         errorStr += "Input size should not be 0!\n";
         assert(false);
         return false;
     }
+
+    // Find out if sum of all inputs can finish the targets.
+    auto optimizedTargetSize = originalTargetSize;
+    {
+        std::uint64_t inputSum = 0;
+        for (auto& input : inputVec)
+        {
+            inputSum += input->GetFixedData();
+        }
+
+        std::uint64_t targetSum = 0;
+        for (std::size_t i = 0; i < originalTargetSize; ++i)
+        {
+            auto& target = targetVec[i];
+            targetSum += target->GetFixedData();
+
+            if (inputSum < targetSum)
+            {
+                optimizedTargetSize = i;
+                break;
+            }
+        }
+
+#ifdef M_DEBUG
+        {
+            auto str = StringFormat::FormatString("inputSum: ", inputSum, " targetSum: ", targetSum,
+                "\noriginalTargetSize: ", originalTargetSize,
+                " optimizedTargetSize: ", optimizedTargetSize);
+            std::cout << str << std::endl;
+        }
+#endif // M_DEBUG
+    }
+
+    // We only need to calculate futher if optimizedTargetSize is greater than 1
+    if (optimizedTargetSize <= 1)
+        return true;
 
     // Make a copy
     auto orderedInputVec = inputVec;
@@ -570,10 +606,10 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
     }
 
     // Firstly, get all possible combinations of each target.
-    std::vector<std::vector<Algorithms::OutputCombination>> allCombVec(targetSize);
+    std::vector<std::vector<Algorithms::OutputCombination>> allCombVec(optimizedTargetSize);
     {
         // Make error handling thread safe
-        std::vector<std::string> allErrorStrVec(targetSize);
+        std::vector<std::string> allErrorStrVec(optimizedTargetSize);
         std::atomic<bool> hasError = false;
 
         static constexpr bool s_kUseHashTable = !USE_REMOVE_DUPLICATES;
@@ -588,8 +624,8 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
 #if USE_STD_PAR_FOR_OVERALL_SOLUTION
         {
             // Iterate indices rather than vector
-            std::vector<std::uint32_t> targetIndices(targetSize);
-            for (std::uint32_t i = 0; i < targetSize; ++i)
+            std::vector<std::uint32_t> targetIndices(optimizedTargetSize);
+            for (std::uint32_t i = 0; i < optimizedTargetSize; ++i)
                 targetIndices[i] = i;
             std::for_each(
                 std::execution::par_unseq, targetIndices.begin(), targetIndices.end(), taskFunc);
@@ -597,7 +633,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
 #else
         {
             vorbrodt::thread_pool threadPool;
-            for (std::uint32_t i = 0; i < targetSize; ++i)
+            for (std::uint32_t i = 0; i < optimizedTargetSize; ++i)
             {
                 threadPool.enqueue_work(taskFunc, i);
             }
@@ -607,7 +643,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
         // Sync the error results
         if (hasError)
         {
-            for (int i = 0; i < targetSize; ++i)
+            for (int i = 0; i < optimizedTargetSize; ++i)
             {
                 auto& currentError = allErrorStrVec[i];
                 if (currentError.empty())
@@ -637,7 +673,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
 
         auto taskFunc = [&](auto& index) -> void {
             // Avoid to copy vector, we use a stack vector to store results
-            std::vector<std::uint32_t> stackIndexResult(targetSize);
+            std::vector<std::uint32_t> stackIndexResult(optimizedTargetSize);
 
             // Invalidate all indices of stackIndexResult
             std::fill(stackIndexResult.begin(), stackIndexResult.end(), kInvalidIndex);
@@ -663,7 +699,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
                 LambdaCombinator([&](auto& selfLambda, std::uint64_t pickedIndices,
                                      std::uint32_t targetIndex, float prevExeed) -> void {
                     // We reached the end of the tree
-                    if (pickedIndices == maxPickedIndices || targetIndex >= targetSize)
+                    if (pickedIndices == maxPickedIndices || targetIndex >= optimizedTargetSize)
                     {
                         outputPath(targetIndex, prevExeed);
                         return;
@@ -810,7 +846,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
 
         // Config all finished targets.
         std::uint64_t allPickedIndices = 0;
-        for (std::uint32_t targetIndex = 0; targetIndex < targetSize; ++targetIndex)
+        for (std::uint32_t targetIndex = 0; targetIndex < optimizedTargetSize; ++targetIndex)
         {
             const auto& currentCombsVec = allCombVec[targetIndex];
             const auto& pCurrentTarget  = targetVec[targetIndex];
@@ -938,4 +974,4 @@ bool Calculator::loadUserData(const char* fileName, UserDataList& dataList)
 
     return true;
 }
-} // namespace JUtils
+} // namespace TianyuanCalc

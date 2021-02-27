@@ -4,9 +4,10 @@
 #pragma once
 
 #include <string>
+#include <type_traits>
 #include <vector>
 
-namespace TianyuanCalc
+namespace GearCalc
 {
 struct UnitScale
 {
@@ -44,105 +45,68 @@ struct UnitScale
     }
 };
 
-class UserData
+// No polymorphism is required
+struct IndividualBuff
 {
-public:
-    UserData(const char* desc, std::uint64_t data) : m_desc(desc), m_data(data) {}
+    std::uint32_t geLi_add = 0;
+    std::uint32_t geNian_add = 0;
+    std::uint32_t geFu_add = 0;
+    double geLi_percent = 0.0;
+    double geNian_percent = 0.0;
+    double geFu_percent = 0.0;
 
+};
+struct GlobalBuff
+{
+    std::uint32_t zongLi_add = 0;
+    std::uint32_t zongNian_add = 0;
+    std::uint32_t zongFu_add = 0;
+    double zongLi_percent = 0.0;
+    double zongNian_percent = 0.0;
+    double zongFu_percent = 0.0;
+};
+struct ChanyeBuff
+{
+    std::uint32_t chanJing_add = 0;
+    std::uint32_t chanNeng_add = 0;
+    double chanjing_percent = 0.0;
+    double chanNeng_percent = 0.0;
+};
+
+struct GearData
+{
+    GearData() {};
     // Enbale move
-    UserData(UserData&& src) noexcept : m_desc(std::move(src.m_desc)), m_data(src.m_data) {}
-    UserData& operator=(UserData&& src) noexcept
-    {
-        m_desc = std::move(src.m_desc);
-        m_data = src.m_data;
-        return *this;
-    }
-
+    GearData(GearData&&) noexcept = default;
+    GearData& operator=(GearData&&) = default;
     // Disable copy
-    UserData(const UserData&) = delete;
-    UserData& operator=(const UserData&) = delete;
-
-    // Compare operators
-    bool operator<(const UserData& rhs) const { return m_data < rhs.m_data; }
-    bool operator<=(const UserData& rhs) const { return m_data <= rhs.m_data; }
-    bool operator>(const UserData& rhs) const { return m_data > rhs.m_data; }
-    bool operator>=(const UserData& rhs) const { return m_data >= rhs.m_data; }
-    bool operator==(const UserData& rhs) const { return m_data == rhs.m_data; }
-
-    const char* GetDesc() const { return m_desc.c_str(); }
-    std::uint64_t GetOriginalData() const { return m_data; }
-    std::uint64_t GetFixedData() const { return m_data + m_offset; }
+    GearData(const GearData&) = delete;
+    GearData& operator=(const GearData&) = delete;
 
 public:
-    mutable int m_offset = 0;
+    std::string name;
 
-private:
-    std::string m_desc;
-
-    // Raw data without any scale
-    std::uint64_t m_data = 0;
+    IndividualBuff individualBuff;
+    GlobalBuff globalBuff;
+    ChanyeBuff chanyeBuff;
 };
 
-class UserDataList
+class GearFileData
 {
 public:
-    static bool ReadFromFile(const char* fileName, std::uint64_t uintScale, UserDataList& outList);
+    static bool ReadFromJsonFile(const char* fileName, std::string& errorStr, GearFileData& outGearFileData);
 
-    UserDataList() {};
-
-    // Disable copy
-    UserDataList(const UserDataList&) = delete;
-    UserDataList& operator=(const UserDataList&) = delete;
-
-    const std::vector<UserData>& GetList() const { return m_list; }
-    std::uint64_t GetUnitScale() const { return m_unitScale; };
-
-private:
-    std::uint64_t m_unitScale = UnitScale::k_10K;
-    std::vector<UserData> m_list;
-};
-
-struct ResultData
-{
-    ResultData() {};
-
+    GearFileData() {};
     // Enbale move
-    ResultData(ResultData&& src) = default;
-    ResultData& operator=(ResultData&& src) = default;
-
+    GearFileData(GearFileData&&) noexcept = default;
+    GearFileData& operator=(GearFileData&&) = default;
     // Disable copy
-    ResultData(const ResultData&) = delete;
-    ResultData& operator=(const ResultData&) = delete;
-
-    bool isFinished() const;
-
-public:
-    const UserData* m_pTarget = nullptr;
-    std::vector<const UserData*> m_combination;
-
-    std::uint64_t m_sum        = 0;
-    std::uint64_t m_difference = 0;
-
-    bool m_isExceeded = false;
+    GearFileData(const GearFileData&) = delete;
+    GearFileData& operator=(const GearFileData&) = delete;
+private:
+    std::uint32_t m_maxNumEquip = 0;
+    std::vector<GearData> m_gearsDataVec;
 };
 
-struct ResultDataList
-{
-    ResultDataList() {};
-    // Disable copy
-    ResultDataList(const ResultDataList&) = delete;
-    ResultDataList& operator=(const ResultDataList&) = delete;
 
-public:
-    std::uint64_t m_unitScale = UnitScale::k_10K;
-    std::vector<ResultData> m_selectedInputs;
-    std::vector<const UserData*> m_remainInputs;
-
-    std::uint64_t m_combiSum  = 0;
-    std::uint64_t m_exeedSum  = 0;
-    std::uint64_t m_remainSum = 0;
-
-    std::uint32_t m_numfinished = 0;
-};
-
-} // namespace TianyuanCalc
+} // namespace GearCalc

@@ -3,7 +3,8 @@ set(app_target_name GearCalcCMD)
 
 # set the source files to compile
 file(GLOB_RECURSE file_source "Src/*.h" "Src/*.cpp" "Src/*.hpp"
-
+XianqiData.json
+XianJieData.json
 )
 # Add to source group, TREE will enable cmake to config the folder layout automatically 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${file_source})

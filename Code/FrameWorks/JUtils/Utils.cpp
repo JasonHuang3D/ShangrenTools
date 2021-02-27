@@ -31,4 +31,15 @@ double Timer::Elapsed() const
     return static_cast<double>(dt.count());
 }
 
+
+// Helper to check if char ptr is empty
+bool isCharPtrEmpty(const char* str)
+{
+    if (str == nullptr)
+        return true;
+    if (std::strlen(str) == 0 || !str[0])
+        return true;
+    return false;
+}
+
 } // namespace JUtils

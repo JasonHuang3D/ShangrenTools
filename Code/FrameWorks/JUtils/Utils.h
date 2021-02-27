@@ -6,6 +6,7 @@
 #include <array>
 #include <chrono>
 #include <functional>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -34,14 +35,46 @@ std::vector<T> TockenizeString(const T& str, const T& delimiters)
     return v;
 }
 
+struct StringFormat
+{
+private:
+    template <typename TStringStream>
+    static void FormatStr(TStringStream& ss)
+    {
+    }
+    template <typename TStringStream, typename T>
+    static void FormatStr(TStringStream& ss, const T& arg)
+    {
+        ss << arg;
+    }
+    template <typename TStringStream, typename THead, typename... TRest>
+    static void FormatStr(TStringStream& ss, const THead& headArg, const TRest&... restArgs)
+    {
+        FormatStr(ss, headArg);
+        FormatStr(ss, restArgs...);
+    }
+
+public:
+    template <typename... TRest>
+    static std::string FormatString(const TRest&... args)
+    {
+        std::stringstream ss;
+        FormatStr(ss, args...);
+        return ss.str();
+    }
+};
+
 template <typename TypeFloat, typename TypeInt>
 TypeFloat FormatIntToFloat(TypeInt value, TypeInt scale)
 {
     return static_cast<TypeFloat>(value) / scale;
 }
 
+// Helper to check if char ptr is empty
+bool isCharPtrEmpty(const char* str);
+
 // Invalid value of every possible bits
-inline constexpr std::uint32_t GetInvalidValue(std::uint32_t numBits)
+constexpr std::uint32_t GetInvalidValue(std::uint32_t numBits)
 {
     return static_cast<std::uint32_t>((1ULL << numBits) - 1);
 }
@@ -132,6 +165,18 @@ private:
     double Elapsed() const;
     std::chrono::high_resolution_clock m_clock;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_t0;
+};
+
+// Helper to get pointer type to a class member
+template <typename TypeMemberPtr>
+struct GetMemberPointerType
+{
+private:
+    template <typename C, typename T>
+    static T get_type(T C::*v) {};
+
+public:
+    typedef decltype(get_type(static_cast<TypeMemberPtr>(nullptr))) Type;
 };
 
 } // namespace JUtils

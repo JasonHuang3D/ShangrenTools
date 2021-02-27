@@ -19,20 +19,23 @@ namespace TianyuanCalc
 bool UserDataList::ReadFromFile(
     const char* fileName, std::uint64_t uintScale, UserDataList& outList)
 {
+    if (isCharPtrEmpty(fileName))
+        return false;
+
     // Init out list
     outList.m_unitScale = uintScale;
     auto& list          = outList.m_list;
     list.clear();
 
-    std::ifstream file(fileName);
+    std::ifstream fileStream(fileName);
     // Chinese locale
-    file.imbue(std::locale("zh_CN.UTF-8"));
+    fileStream.imbue(std::locale("zh_CN.UTF-8"));
 
-    if (file.is_open())
+    if (fileStream.is_open())
     {
-        // Read file by line
+        // Read fileStream by line
         std::string line;
-        while (std::getline(file, line))
+        while (std::getline(fileStream, line))
         {
             // Skip empty line or commented line
             if (line.empty() || line[0] == '#')
@@ -56,7 +59,7 @@ bool UserDataList::ReadFromFile(
             }
         }
 
-        file.close();
+        fileStream.close();
         return true;
     }
 
