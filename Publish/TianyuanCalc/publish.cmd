@@ -10,7 +10,7 @@ set target_name=TianyuanCalcCMD
 set build_folder=build
 set build_mode=Release
 set dest_folder=%~dp0bin\
-set dest_name=通用副本工具beta1.7.zip
+set dest_name=通用副本工具beta1.7.1.zip
 set intro_file="更新及说明.txt"
 
 set root_folder=%~dp0..\..\
@@ -30,12 +30,10 @@ set target_exe=%bin_folder%%target_name%.exe
 set target_input_file=%project_folder%inputData.txt
 set target_target_file=%project_folder%targetData.txt
 
-if not exist "%target_exe%" (
 cd %root_folder%
 call cmake -B %root_build_folder%
 call cmake --build %root_build_folder% --config %build_mode%
 cd %~dp0
-)
 
 call :pack_files
 

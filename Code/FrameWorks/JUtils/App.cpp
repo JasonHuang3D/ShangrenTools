@@ -38,12 +38,15 @@ int CmdAppBase::StartMainLoop()
             break;
         }
 
+        // Check Errors
+        ReportError();
         // Exit if we have any error
-        if (ReportError())
-        {
-            OnExitState();
-            return -1;
-        }
+        //if (ReportError())
+        //{
+        //
+        //    //OnExitState();
+        //    //return -1;
+        //}
     }
 
     return 0;

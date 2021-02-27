@@ -38,8 +38,8 @@ public:
 
     bool Init(UnitScale::Values unitScale);
 
-    bool LoadInputData(const char* fileName);
-    bool LoadTargetData(const char* fileName);
+    bool LoadInputData(const char* fileName, std::string& errorStr);
+    bool LoadTargetData(const char* fileName, std::string& errorStr);
 
     bool Run(ResultDataList& resultList, std::string& errorStr, Solution solution);
 
@@ -47,7 +47,7 @@ public:
     const UserDataList& GetTargetDataVec() const { return m_targetDataList; }
 
 private:
-    bool loadUserData(const char* fileName, UserDataList& dataList);
+    bool loadUserData(const char* fileName, std::string& errorStr, UserDataList& dataList);
 
     UserDataList m_inputDataVec;
     UserDataList m_targetDataList;

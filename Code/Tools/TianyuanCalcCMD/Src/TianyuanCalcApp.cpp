@@ -105,12 +105,12 @@ private:
         m_calculator.Init(UnitScale::k_10K);
 
         // Load user data
-        if (!m_calculator.LoadInputData("inputData.txt"))
+        if (!m_calculator.LoadInputData("inputData.txt", m_errorStr))
         {
             m_errorStr += u8"加载inputData.txt错误, 请检查文件及其内容!\n";
             return;
         }
-        if (!m_calculator.LoadTargetData("targetData.txt"))
+        if (!m_calculator.LoadTargetData("targetData.txt", m_errorStr))
         {
             m_errorStr += u8"加载targetData.txt错误, 请检查文件及其内容!\n";
             return;

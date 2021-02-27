@@ -923,14 +923,14 @@ bool Calculator::Init(UnitScale::Values unitScale)
 
     return true;
 }
-bool Calculator::LoadInputData(const char* fileName)
+bool Calculator::LoadInputData(const char* fileName, std::string& errorStr)
 {
-    return loadUserData(fileName, m_inputDataVec);
+    return loadUserData(fileName, errorStr, m_inputDataVec);
 }
 
-bool Calculator::LoadTargetData(const char* fileName)
+bool Calculator::LoadTargetData(const char* fileName, std::string& errorStr)
 {
-    return loadUserData(fileName, m_targetDataList);
+    return loadUserData(fileName, errorStr, m_targetDataList);
 }
 
 bool Calculator::Run(ResultDataList& resultList, std::string& errorStr, Solution solution)
@@ -964,9 +964,9 @@ bool Calculator::Run(ResultDataList& resultList, std::string& errorStr, Solution
         return false;
     }
 }
-bool Calculator::loadUserData(const char* fileName, UserDataList& dataList)
+bool Calculator::loadUserData(const char* fileName, std::string& errorStr, UserDataList& dataList)
 {
-    if (!UserDataList::ReadFromFile(fileName, m_unitScale, dataList))
+    if (!UserDataList::ReadFromFile(fileName, m_unitScale, errorStr, dataList))
         return false;
 
     if (dataList.GetList().empty())

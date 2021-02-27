@@ -86,7 +86,8 @@ private:
 class UserDataList
 {
 public:
-    static bool ReadFromFile(const char* fileName, std::uint64_t uintScale, UserDataList& outList);
+    static bool ReadFromFile(const char* fileName, std::uint64_t uintScale, std::string& errorStr,
+        UserDataList& outList);
 
     UserDataList() {};
 
