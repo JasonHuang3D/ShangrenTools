@@ -71,12 +71,25 @@ private:
         std::cout << u8"开始计算..." << std::endl;
         m_errorStr.clear();
 
-        GearFileData gearFileData;
-        auto succeed = GearFileData::ReadFromJsonFile("XianqiData.json", m_errorStr, gearFileData);
-        if (!succeed)
+        XianqiFileData gearFileData;
         {
-            m_errorStr += u8"加载GearsData.json文件失败,请检查文件!";
-            return;
+            auto succeed = XianqiFileData::ReadFromJsonFile("XianqiData.json", m_errorStr, gearFileData);
+            if (!succeed)
+            {
+                m_errorStr += u8"加载XianqiData.json文件失败,请检查文件!";
+                return;
+            }
+        }
+
+
+        XianjieFileData xianjieFileData;
+        {
+            auto succeed = XianjieFileData::ReadFromJsonFile("XianjieData.json", m_errorStr, xianjieFileData);
+            if (!succeed)
+            {
+                m_errorStr += u8"加载XianjieData.json文件失败,请检查文件!";
+                return;
+            }
         }
     }
 

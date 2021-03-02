@@ -179,4 +179,14 @@ public:
     typedef decltype(get_type(static_cast<TypeMemberPtr>(nullptr))) Type;
 };
 
+
+
+// Simple helper function for singleton types.
+template<typename T>
+T& GetSingletonInstance()
+{
+    static T s_instance;
+    return s_instance;
+}
+
 } // namespace JUtils
