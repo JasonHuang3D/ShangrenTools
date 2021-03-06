@@ -4,13 +4,15 @@
 
 #include "JUtils/pch.h"
 
-#include "UserData.h"
+#include "GearUserData.h"
 
 #include "JUtils/Utils.h"
 #include "nlohmann/json.hpp"
 
+#include <cmath>
 #include <fstream>
 #include <functional>
+#include <iomanip>
 
 using Json = nlohmann::json;
 using namespace JUtils;
@@ -20,7 +22,11 @@ namespace
 {
 namespace JsonUtils
 {
-bool ParseJsonFile(const char* fileName, std::string& errorStr, Json& outJsonRoot)
+
+constexpr auto k_key_repeatable     = u8"重复个数";
+constexpr std::uint32_t k_maxRepeat = 64;
+
+bool LoadJsonFile(const char* fileName, std::string& errorStr, Json& outJsonRoot)
 {
     if (isCharPtrEmpty(fileName))
     {
@@ -38,12 +44,17 @@ bool ParseJsonFile(const char* fileName, std::string& errorStr, Json& outJsonRoo
         // If there is any error during parsing, return false.
         if (outJsonRoot.is_discarded())
         {
-            errorStr += StringFormat::FormatString(
-                u8"JSON文件: ", fileName, u8" 有误! 推荐使用 Visual Studio Code 进行编辑. \n");
+            errorStr += FormatString(
+                u8"JSON文件: ", fileName, u8" 有误! 推荐使用 Visual Studio Code 进行编辑.\n");
             return false;
         }
 
         return true;
+    }
+    else
+    {
+        errorStr += FormatString(u8"JSON文件: ", fileName, u8" 不能被读取,请检查!\n");
+        return false;
     }
     return false;
 }
@@ -190,99 +201,99 @@ const JsonProcessMap& GetJsonProcessMap()
             );
         };
 
-        configMap(u8"各力数值", &IndividualBuff::geLi_add, 
+        configMap(u8"各力数值", &XianRenPropBuff::li_add, 
             &GearData::individualBuff,
             &TouXiangData::individualBuff,
             &XianlvData::fushi_buff, &XianlvData::tianfu_individual_buff,
             &XianZhiData::individual_buff);
-        configMap(u8"各念数值", &IndividualBuff::geNian_add,
+        configMap(u8"各念数值", &XianRenPropBuff::nian_add,
             &GearData::individualBuff,
             &TouXiangData::individualBuff,
             &XianlvData::fushi_buff, &XianlvData::tianfu_individual_buff,
             & XianZhiData::individual_buff);
-        configMap(u8"各福数值", &IndividualBuff::geFu_add, 
+        configMap(u8"各福数值", &XianRenPropBuff::fu_add, 
             &GearData::individualBuff,
             &TouXiangData::individualBuff,
             &XianlvData::fushi_buff, &XianlvData::tianfu_individual_buff,
             &XianZhiData::individual_buff);
-        configMap(u8"各力百分比", &IndividualBuff::geLi_percent, 
+        configMap(u8"各力百分比", &XianRenPropBuff::li_percent, 
             &GearData::individualBuff,
             &TouXiangData::individualBuff,
             &XianlvData::fushi_buff, &XianlvData::tianfu_individual_buff,
             &XianZhiData::individual_buff);
-        configMap(u8"各念百分比", &IndividualBuff::geNian_percent, 
+        configMap(u8"各念百分比", &XianRenPropBuff::nian_percent, 
             &GearData::individualBuff,
             &TouXiangData::individualBuff,
             &XianlvData::fushi_buff, &XianlvData::tianfu_individual_buff,
             &XianZhiData::individual_buff);
-        configMap(u8"各福百分比", &IndividualBuff::geFu_percent, 
+        configMap(u8"各福百分比", &XianRenPropBuff::fu_percent, 
             &GearData::individualBuff, 
             &TouXiangData::individualBuff,
             &XianlvData::fushi_buff, &XianlvData::tianfu_individual_buff,
             &XianZhiData::individual_buff);
 
-        configMap(u8"总力数值", &GlobalBuff::zongLi_add, 
+        configMap(u8"总力数值", &XianRenPropBuff::li_add,
             &GearData::globalBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_global_buff,
             nullptr);
-        configMap(u8"总念数值", &GlobalBuff::zongNian_add, 
+        configMap(u8"总念数值", &XianRenPropBuff::nian_add,
             &GearData::globalBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_global_buff,
             nullptr);
-        configMap(u8"总福数值", &GlobalBuff::zongFu_add, 
+        configMap(u8"总福数值", &XianRenPropBuff::fu_add,
             &GearData::globalBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_global_buff,
             nullptr);
-        configMap(u8"总力百分比", &GlobalBuff::zongLi_percent, 
+        configMap(u8"总力百分比", &XianRenPropBuff::li_percent,
             &GearData::globalBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_global_buff,
             nullptr);
-        configMap(u8"总念百分比", &GlobalBuff::zongNian_percent, 
+        configMap(u8"总念百分比", &XianRenPropBuff::nian_percent,
             &GearData::globalBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_global_buff,
             nullptr);
-        configMap(u8"总福百分比", &GlobalBuff::zongFu_percent, 
+        configMap(u8"总福百分比", &XianRenPropBuff::fu_percent,
             &GearData::globalBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_global_buff,
             nullptr);
 
-        configMap(u8"产晶数值", &ChanyeBuff::chanJing_add, 
+        configMap(u8"产晶数值", &ChanYeBuff::chanJing_add, 
             &GearData::chanyeBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_chanye_buff,
             nullptr);
-        configMap(u8"产能数值", &ChanyeBuff::chanNeng_add,
+        configMap(u8"产能数值", &ChanYeBuff::chanNeng_add,
             &GearData::chanyeBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_chanye_buff,
             nullptr);
-        configMap(u8"产晶百分比", &ChanyeBuff::chanjing_percent,
+        configMap(u8"产晶百分比", &ChanYeBuff::chanjing_percent,
             &GearData::chanyeBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_chanye_buff,
             nullptr);
-        configMap(u8"产能百分比", &ChanyeBuff::chanNeng_percent, 
+        configMap(u8"产能百分比", &ChanYeBuff::chanNeng_percent, 
             &GearData::chanyeBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_chanye_buff,
             nullptr);
 
 
-        configMap(u8"力", &XianrenProp::li, 
+        configMap(u8"仙人基础力", &XianRenProp::li, 
             nullptr, nullptr, nullptr, nullptr, nullptr,
             &XianRenData::baseProp
             );
-        configMap(u8"念", &XianrenProp::nian,
+        configMap(u8"仙人基础念", &XianRenProp::nian,
             nullptr, nullptr, nullptr, nullptr, nullptr,
             &XianRenData::baseProp
         );
-        configMap(u8"福", &XianrenProp::fu,
+        configMap(u8"仙人基础福", &XianRenProp::fu,
             nullptr, nullptr, nullptr, nullptr, nullptr,
             &XianRenData::baseProp
         );
@@ -307,7 +318,7 @@ struct ProcessSelector
 
     template <typename FunctionType>
     ProcessSelector(TargetProcessType::Enum targetProcessType,
-        JsonProcessOpType::Enum processOpType, FunctionType callBack, bool isRequired = true) :
+        JsonProcessOpType::Enum processOpType, FunctionType&& callBack, bool isRequired = true) :
         targetProcessType(targetProcessType),
         processOpType(processOpType),
         callBack(std::move(callBack)),
@@ -329,9 +340,9 @@ struct ProcessSelector
 };
 
 template <auto TypeCheckFuncPtr, typename TypeData, typename TypeValue>
-struct ProcessSelectorWrapper
+struct ProcessSelectorCallBackWrapper
 {
-    ProcessSelectorWrapper(TypeValue TypeData::*dataMemberPtr, const char* desiredKey) :
+    ProcessSelectorCallBackWrapper(TypeValue TypeData::*dataMemberPtr, const char* desiredKey) :
         dataMemberPtr(dataMemberPtr), desiredKey(desiredKey) {};
 
     bool operator()(
@@ -339,7 +350,7 @@ struct ProcessSelectorWrapper
     {
         if (jsonKey != desiredKey)
         {
-            errorStr += StringFormat::FormatString(jsonKey, " Expect to be: ", desiredKey, "\n");
+            errorStr += FormatString(jsonKey, " Expect to be: ", desiredKey, "\n");
             assert(false);
             return false;
         }
@@ -352,7 +363,7 @@ struct ProcessSelectorWrapper
         }
         else
         {
-            errorStr += StringFormat::FormatString(jsonKey, " value is not a valid type!\n");
+            errorStr += FormatString(jsonKey, " value is not a valid type!\n");
             assert(false);
             return false;
         }
@@ -365,14 +376,14 @@ struct ProcessSelectorWrapper
 using PropGroupsToProcessSelectorMapType = std::unordered_map<std::string, ProcessSelector>;
 const std::string k_nullSubGroupKey      = "NullSubGroup";
 
-struct BufferArrayDescBase
+struct JsonArrayDescBase
 {
     virtual const char* GetKeyOfArray() const                                    = 0;
     virtual const PropGroupsToProcessSelectorMapType& GetGroupProcessMap() const = 0;
 };
 
 template <bool UsePropGroups, bool IgnoreUnKnowPropGroup = false, typename TypeData>
-bool ParseBuffArray(const BufferArrayDescBase& desc, const char* fileName, const Json& jsonRoot,
+bool ParseJsonArray(const JsonArrayDescBase& desc, const char* fileName, const Json& jsonRoot,
     std::string& errorStr, std::vector<TypeData>& outDataVec)
 {
 
@@ -390,7 +401,7 @@ bool ParseBuffArray(const BufferArrayDescBase& desc, const char* fileName, const
     auto itElementContainer = jsonRoot.find(keyOfArray);
     if (itElementContainer == jsonRoot.end() || !itElementContainer->is_object())
     {
-        errorStr += StringFormat::FormatString(u8"文件: ", fileName, u8" 缺少有效的: ", keyOfArray);
+        errorStr += FormatString(u8"文件: ", fileName, u8" 缺少有效的: ", keyOfArray);
         return false;
     }
 
@@ -399,12 +410,12 @@ bool ParseBuffArray(const BufferArrayDescBase& desc, const char* fileName, const
     outDataVec.reserve(elementContainer.size());
     const auto& kBuffProcessMap = JsonUtils::GetJsonProcessMap();
 
-    auto processProp = [&](const Json& propGroupValue, const std::string& elementKey,
-                           TypeData* pData, const char* propGroupKey,
-                           const ProcessSelector& processSelector, bool& outHasValue) -> bool {
+    auto processObject = [&](const Json& propGroupValue, const std::string& elementKey,
+                             TypeData* pData, const char* propGroupKey,
+                             const ProcessSelector& processSelector, bool& outHasValue) -> bool {
         if (!propGroupValue.is_object())
         {
-            // propGroupValue is a value type.
+            // propGroupValue is a value type. We only accept value if call back is assigned.
 
             if (processSelector.callBack)
             {
@@ -417,7 +428,7 @@ bool ParseBuffArray(const BufferArrayDescBase& desc, const char* fileName, const
             }
             else
             {
-                errorStr += StringFormat::FormatString(
+                errorStr += FormatString(
                     keyOfArray, ": ", elementKey, u8", 节点:", propGroupKey, u8", 应该为Object!\n");
                 return false;
             }
@@ -427,6 +438,10 @@ bool ParseBuffArray(const BufferArrayDescBase& desc, const char* fileName, const
 
             for (auto& prop : propGroupValue.items())
             {
+                // Skip if we are parsing k_key_repeatable
+                if (prop.key() == k_key_repeatable)
+                    continue;
+
                 if (processSelector.callBack)
                 {
                     processSelector.callBack(prop.key(), prop.value(), errorStr, pData);
@@ -436,9 +451,9 @@ bool ParseBuffArray(const BufferArrayDescBase& desc, const char* fileName, const
                 auto propIt = kBuffProcessMap.find(prop.key());
                 if (propIt == kBuffProcessMap.end())
                 {
-                    errorStr += StringFormat::FormatString(keyOfArray, ": ", elementKey,
-                        u8", 词条组:", propGroupKey != nullptr ? propGroupKey : u8"无",
-                        u8", 词条: ", prop.key(), u8" 无效请纠正!\n");
+                    errorStr += FormatString(keyOfArray, ": ", elementKey, u8", 词条组:",
+                        propGroupKey != nullptr ? propGroupKey : u8"无", u8", 词条: ", prop.key(),
+                        u8" 无效请纠正!\n");
                     return false;
                 }
 
@@ -484,10 +499,9 @@ bool ParseBuffArray(const BufferArrayDescBase& desc, const char* fileName, const
     {
         // Create data
         auto& data = outDataVec.emplace_back();
-        data.name  = element.key().c_str();
+        data.name  = element.key();
 
         bool hasAnyValue = false;
-
         if constexpr (UsePropGroups)
         {
             // Count the requirement.
@@ -495,17 +509,22 @@ bool ParseBuffArray(const BufferArrayDescBase& desc, const char* fileName, const
 
             for (auto& propGroup : element.value().items())
             {
+                // Skip if we are parsing k_key_repeatable
+                if (propGroup.key() == k_key_repeatable)
+                    continue;
+
                 auto itGroupProcess = groupProcessMap.find(propGroup.key());
                 if (itGroupProcess == groupProcessMap.end())
                 {
+
                     if constexpr (IgnoreUnKnowPropGroup)
                     {
                         continue;
                     }
                     else
                     {
-                        errorStr += StringFormat::FormatString(keyOfArray, ": ", element.key(),
-                            u8", 组: ", propGroup.key(), u8" 包含未知组名\n");
+                        errorStr += FormatString(keyOfArray, ": ", element.key(), u8", 组: ",
+                            propGroup.key(), u8" 包含未知组名\n");
                         assert(false);
                         return false;
                     }
@@ -516,7 +535,7 @@ bool ParseBuffArray(const BufferArrayDescBase& desc, const char* fileName, const
                 if (processSelector.isRequired)
                     ++numMetRequirements;
 
-                auto succeed = processProp(propGroup.value(), element.key(), &data,
+                auto succeed = processObject(propGroup.value(), element.key(), &data,
 
                     itGroupProcess->first.c_str(), processSelector,
 
@@ -531,15 +550,15 @@ bool ParseBuffArray(const BufferArrayDescBase& desc, const char* fileName, const
 
             if (numMetRequirements != sumRequirements)
             {
-                errorStr += StringFormat::FormatString(
-                    keyOfArray, ": ", element.key(), u8" 缺少需要的组,请检查!\n");
+                errorStr +=
+                    FormatString(keyOfArray, ": ", element.key(), u8" 缺少需要的组,请检查!\n");
                 assert(false);
                 return false;
             }
         }
         else
         {
-            auto succeed = processProp(element.value(), element.key(), &data,
+            auto succeed = processObject(element.value(), element.key(), &data,
 
                 k_nullSubGroupKey.c_str(), groupProcessMap.at(k_nullSubGroupKey),
 
@@ -551,19 +570,141 @@ bool ParseBuffArray(const BufferArrayDescBase& desc, const char* fileName, const
 
         if (!hasAnyValue)
         {
-            errorStr += StringFormat::FormatString(
-                keyOfArray, ": ", element.key(), u8", 未找到任何有效词条\n");
+            errorStr += FormatString(keyOfArray, ": ", element.key(), u8", 未找到任何有效词条\n");
             return false;
+        }
+
+        // Config the repeat
+        std::uint32_t repeatNum = 0;
+        if (element.value().contains(k_key_repeatable))
+        {
+            auto& repeatJsonValue = element.value().at(k_key_repeatable);
+            if (repeatJsonValue.is_number_integer())
+            {
+                repeatNum = repeatJsonValue.get<std::uint32_t>();
+            }
+            else
+            {
+                errorStr += FormatString(std::quoted(k_key_repeatable), u8"的值应该为整数数字!\n");
+                assert(false);
+                return false;
+            }
+
+            // Check repeatNum
+            if (repeatNum < 1 || repeatNum > k_maxRepeat)
+            {
+                errorStr += FormatString(std::quoted(k_key_repeatable),
+                    u8"的值不在范围内, 最小是1, 最大为: ", k_maxRepeat, "\n");
+                assert(false);
+                return false;
+            }
+        }
+
+        if (repeatNum > 1)
+        {
+            auto copy = data;
+            // Start from 1, as we skiped the original one.
+            for (std::uint32_t i = 1; i < repeatNum; ++i)
+            {
+                auto& repeatData = outDataVec.emplace_back(copy);
+                repeatData.name  = FormatString(copy.name, u8"-复制", i);
+            }
         }
     }
     return true;
 }
 
+// Helper functions for parsing groups
+template <bool UsePropGroups = true, bool IgnoreUnKnowPropGroup = false, typename TypeTargetData>
+bool ParseGroups(const Json& jsonRoot, const char* fileName, std::string& errorStr,
+    std::vector<TypeTargetData>& targetDataVec, const JsonUtils::JsonArrayDescBase& desc,
+    std::unordered_map<std::string, const TypeTargetData* const>* pTargetLoopUpTable = nullptr)
+{
+    auto succeed = JsonUtils::ParseJsonArray<UsePropGroups, IgnoreUnKnowPropGroup>(
+        desc, fileName, jsonRoot, errorStr, targetDataVec);
+    if (!succeed)
+        return false;
+
+    if (pTargetLoopUpTable != nullptr)
+    {
+        auto& loopUpTable = *pTargetLoopUpTable;
+        for (auto& data : targetDataVec)
+        {
+            auto insertedPair = loopUpTable.try_emplace(data.name, &data);
+            if (!insertedPair.second)
+            {
+                errorStr += FormatString(
+                    u8"文件: ", fileName, u8" 节点: ", data.name, u8" 有重复,请纠正!\n");
+                assert(false);
+                return false;
+            }
+        }
+    }
+
+    return true;
+};
+template <bool UsePropGroups = true, bool IgnoreUnKnowPropGroup = false, typename TypeTargetData,
+    typename TypeRefData>
+bool ParseGroups(const Json& jsonRoot, const char* fileName, std::string& errorStr,
+    std::vector<TypeTargetData>& targetDataVec, const JsonUtils::JsonArrayDescBase& desc,
+    std::unordered_map<std::string, const TypeTargetData* const>* pTargetLoopUpTable,
+    std::unordered_map<std::string, const TypeRefData* const>* pRefLoopUptable,
+    std::string TypeTargetData::*pRefStrMemberPtr,
+    const TypeRefData* TypeTargetData::*pRefPtrMemberPtr, bool useUniqueRef = true)
+{
+    auto succeed = ParseGroups<UsePropGroups, IgnoreUnKnowPropGroup>(
+        jsonRoot, fileName, errorStr, targetDataVec, desc, pTargetLoopUpTable);
+    if (!succeed)
+        return false;
+
+    if (pRefLoopUptable != nullptr)
+    {
+        auto& refTable = *pRefLoopUptable;
+        std::unordered_map<std::string, const TypeTargetData*> uniqueTable;
+
+        for (auto& data : targetDataVec)
+        {
+            auto& strKey = data.*pRefStrMemberPtr;
+
+            if (strKey.empty())
+                continue;
+
+            auto itRefTable = refTable.find(strKey);
+            if (itRefTable != refTable.end())
+            {
+                if (useUniqueRef)
+                {
+                    auto insertedPair = uniqueTable.try_emplace(strKey, &data);
+                    if (!insertedPair.second)
+                    {
+                        errorStr += FormatString(u8"文件: ", fileName, ", ", desc.GetKeyOfArray(),
+                            u8" 中的节点: ", data.name, ", 中的属性: ", strKey, u8" 已经被 ",
+                            uniqueTable.at(strKey)->name, u8" 选择!\n");
+                        assert(false);
+                        return false;
+                    }
+                }
+
+                data.*pRefPtrMemberPtr = itRefTable->second;
+            }
+            else
+            {
+                errorStr += FormatString(u8"文件: ", fileName, ", ", desc.GetKeyOfArray(),
+                    u8" 中的节点: ", data.name, u8", 中的属性: ", strKey, u8" 不存在,请检查!\n");
+                assert(false);
+                return false;
+            }
+        }
+    }
+
+    return true;
+};
+
 } // namespace JsonUtils
 
 namespace GearJson
 {
-struct XianqiProcessArrayDesc : public JsonUtils::BufferArrayDescBase
+struct XianqiProcessArrayDesc : public JsonUtils::JsonArrayDescBase
 {
     const char* GetKeyOfArray() const override { return u8"仙器"; }
     const JsonUtils::PropGroupsToProcessSelectorMapType& GetGroupProcessMap() const override
@@ -585,7 +726,7 @@ constexpr auto k_gearKey_numEquip = u8"仙器佩戴数量";
 
 namespace XianjieJson
 {
-struct TouXiangProcessArrayDesc : public JsonUtils::BufferArrayDescBase
+struct TouXiangProcessArrayDesc : public JsonUtils::JsonArrayDescBase
 {
     const char* GetKeyOfArray() const override { return u8"头像"; }
     const JsonUtils::PropGroupsToProcessSelectorMapType& GetGroupProcessMap() const override
@@ -600,7 +741,7 @@ struct TouXiangProcessArrayDesc : public JsonUtils::BufferArrayDescBase
         return s_outMap;
     }
 };
-struct XianLvProcessArrayDesc : public JsonUtils::BufferArrayDescBase
+struct XianLvProcessArrayDesc : public JsonUtils::JsonArrayDescBase
 {
     const char* GetKeyOfArray() const override { return u8"仙侣"; }
     const JsonUtils::PropGroupsToProcessSelectorMapType& GetGroupProcessMap() const override
@@ -617,7 +758,7 @@ struct XianLvProcessArrayDesc : public JsonUtils::BufferArrayDescBase
         return s_outMap;
     }
 };
-struct XianZhiProcessArrayDesc : public JsonUtils::BufferArrayDescBase
+struct XianZhiProcessArrayDesc : public JsonUtils::JsonArrayDescBase
 {
     const char* GetKeyOfArray() const override { return u8"仙职"; }
     const JsonUtils::PropGroupsToProcessSelectorMapType& GetGroupProcessMap() const override
@@ -632,15 +773,15 @@ struct XianZhiProcessArrayDesc : public JsonUtils::BufferArrayDescBase
             s_outMap.try_emplace(k_key,
 
                 JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::NumOps,
-                JsonUtils::ProcessSelectorWrapper<&Json::is_string, XianZhiData, std::string>(
-                    &XianZhiData::xianlvName, k_key),
+                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_string, XianZhiData,
+                    std::string>(&XianZhiData::xianlvName, k_key),
                 false // False means this key is optional in Json file.
             );
         }
         return s_outMap;
     }
 };
-struct XianRenProcessArrayDesc : public JsonUtils::BufferArrayDescBase
+struct XianRenProcessArrayDesc : public JsonUtils::JsonArrayDescBase
 {
     const char* GetKeyOfArray() const override { return u8"仙人"; }
     const JsonUtils::PropGroupsToProcessSelectorMapType& GetGroupProcessMap() const override
@@ -655,8 +796,8 @@ struct XianRenProcessArrayDesc : public JsonUtils::BufferArrayDescBase
             s_outMap.try_emplace(k_key,
 
                 JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::NumOps,
-                JsonUtils::ProcessSelectorWrapper<&Json::is_string, XianRenData, std::string>(
-                    &XianRenData::xianZhiName, k_key),
+                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_string, XianRenData,
+                    std::string>(&XianRenData::xianZhiName, k_key),
                 false // False means this key is optional in Json file.
             );
         }
@@ -664,89 +805,21 @@ struct XianRenProcessArrayDesc : public JsonUtils::BufferArrayDescBase
     }
 };
 
-// Helper functions for parsing groups
-template <bool UsePropGroups = true, bool IgnoreUnKnowPropGroup = false, typename TypeTargetData>
-bool ParseGroups(const Json& jsonRoot, const char* fileName, std::string& errorStr,
-    std::vector<TypeTargetData>& targetDataVec, const JsonUtils::BufferArrayDescBase& desc,
-    std::unordered_map<std::string, const TypeTargetData* const>* pTargetLoopUpTable = nullptr)
-{
-    auto succeed = JsonUtils::ParseBuffArray<UsePropGroups, IgnoreUnKnowPropGroup>(
-        desc, fileName, jsonRoot, errorStr, targetDataVec);
-    if (!succeed)
-        return false;
+constexpr auto k_key_baseUnitScale         = u8"仙人基础属性单位";
+constexpr auto k_key_calculateXianRenArray = u8"参与运算仙人";
+constexpr auto k_key_calculateAllXianRen   = "ALL";
 
-    if (pTargetLoopUpTable != nullptr)
-    {
-        auto& loopUpTable = *pTargetLoopUpTable;
-        for (auto& data : targetDataVec)
-        {
-            auto insertedPair = loopUpTable.try_emplace(data.name, &data);
-            if (!insertedPair.second)
-            {
-                errorStr += StringFormat::FormatString(
-                    u8"文件: ", fileName, u8" 节点: ", data.name, u8" 有重复,请纠正!\n");
-                assert(false);
-                return false;
-            }
-        }
-    }
-
-    return true;
-};
-
-template <bool UsePropGroups = true, bool IgnoreUnKnowPropGroup = false, typename TypeTargetData,
-    typename TypeRefData>
-bool ParseGroups(const Json& jsonRoot, const char* fileName, std::string& errorStr,
-    std::vector<TypeTargetData>& targetDataVec, const JsonUtils::BufferArrayDescBase& desc,
-    std::unordered_map<std::string, const TypeTargetData* const>* pTargetLoopUpTable,
-    std::unordered_map<std::string, const TypeRefData* const>* pRefLoopUptable,
-    std::string TypeTargetData::*pRefStrMemberPtr,
-    const TypeRefData* TypeTargetData::*pRefPtrMemberPtr)
-{
-    auto succeed = ParseGroups<UsePropGroups, IgnoreUnKnowPropGroup>(
-        jsonRoot, fileName, errorStr, targetDataVec, desc, pTargetLoopUpTable);
-    if (!succeed)
-        return false;
-
-    if (pRefLoopUptable != nullptr)
-    {
-        auto& refTable = *pRefLoopUptable;
-        for (auto& data : targetDataVec)
-        {
-            if (!(data.*pRefStrMemberPtr).empty())
-            {
-                auto it = refTable.find(data.*pRefStrMemberPtr);
-                if (it != refTable.end())
-                {
-                    data.*pRefPtrMemberPtr = it->second;
-                }
-                else
-                {
-                    errorStr += StringFormat::FormatString(u8"文件: ", fileName, ", ",
-                        desc.GetKeyOfArray(), u8" 中的节点: ", data.name,
-                        ", 中的属性: ", data.*pRefStrMemberPtr, u8" 不存在,请检查!\n");
-                    assert(false);
-                    return false;
-                }
-            }
-        }
-    }
-
-    return true;
-};
-
-constexpr auto k_xianrenKey_baseUnitScale = u8"仙人基础属性单位";
 } // namespace XianjieJson
 } // namespace
 
 namespace GearCalc
 {
-bool XianqiFileData::ReadFromJsonFile(
-    const char* fileName, std::string& errorStr, XianqiFileData& outGearFileData)
+bool XianQiFileData::ReadFromJsonFile(
+    const char* fileName, std::string& errorStr, XianQiFileData& out)
 {
-    outGearFileData.Reset();
+    out.Reset();
     Json jsonRoot;
-    if (!JsonUtils::ParseJsonFile(fileName, errorStr, jsonRoot))
+    if (!JsonUtils::LoadJsonFile(fileName, errorStr, jsonRoot))
         return false;
 
     // Start config
@@ -756,20 +829,19 @@ bool XianqiFileData::ReadFromJsonFile(
         auto it = jsonRoot.find(GearJson::k_gearKey_numEquip);
         if (it == jsonRoot.end() || !it->is_number_unsigned())
         {
-            errorStr += StringFormat::FormatString(
+            errorStr += FormatString(
                 u8"文件: ", fileName, u8" 缺少有效的: ", GearJson::k_gearKey_numEquip, "\n");
             return false;
         }
 
-        outGearFileData.m_maxNumEquip = it->get<std::uint32_t>();
+        out.m_maxNumEquip = it->get<std::uint32_t>();
     }
 
     // Parse each gear
     {
-        auto succeed = JsonUtils::ParseBuffArray<true>(
-            GetSingletonInstance<GearJson::XianqiProcessArrayDesc>(), fileName, jsonRoot, errorStr,
-            outGearFileData.m_gearsDataVec);
-
+        auto succeed =
+            JsonUtils::ParseGroups<true>(jsonRoot, fileName, errorStr, out.m_gearsDataVec,
+                GetSingletonInstance<GearJson::XianqiProcessArrayDesc>(), &out.m_loopUpGears);
         if (!succeed)
             return false;
     }
@@ -777,100 +849,207 @@ bool XianqiFileData::ReadFromJsonFile(
     return true;
 }
 
-void XianqiFileData::Reset()
+void XianQiFileData::Reset()
 {
     m_maxNumEquip = 0;
+    m_loopUpGears.clear();
     m_gearsDataVec.clear();
 }
 
-bool XianjieFileData::ReadFromJsonFile(
-    const char* fileName, std::string& errorStr, XianjieFileData& outXianjieFileData)
+bool XianJieFileData::ReadFromJsonFile(
+    const char* fileName, std::string& errorStr, XianJieFileData& out)
 {
-    outXianjieFileData.Reset();
+    out.Reset();
     Json jsonRoot;
-    if (!JsonUtils::ParseJsonFile(fileName, errorStr, jsonRoot))
+    if (!JsonUtils::LoadJsonFile(fileName, errorStr, jsonRoot))
         return false;
 
     // Start config
 
     // Parse each Touxiang
     {
-        auto succeed = XianjieJson::ParseGroups<false>(jsonRoot, fileName, errorStr,
-            outXianjieFileData.m_touxiangDataVec,
-            GetSingletonInstance<XianjieJson::TouXiangProcessArrayDesc>());
+        auto succeed = JsonUtils::ParseGroups<false>(jsonRoot, fileName, errorStr,
+            out.m_touXiangDataVec, GetSingletonInstance<XianjieJson::TouXiangProcessArrayDesc>());
         if (!succeed)
             return false;
     }
 
     // Parse each Xianlv
     {
-        auto succeed = XianjieJson::ParseGroups<true>(jsonRoot, fileName, errorStr,
-            outXianjieFileData.m_xianLvDataVec,
-            GetSingletonInstance<XianjieJson::XianLvProcessArrayDesc>(),
-            &outXianjieFileData.m_loopUpXainlv);
+        auto succeed =
+            JsonUtils::ParseGroups<true>(jsonRoot, fileName, errorStr, out.m_xianLvDataVec,
+                GetSingletonInstance<XianjieJson::XianLvProcessArrayDesc>(), &out.m_loopUpXainLv);
         if (!succeed)
             return false;
     }
 
     // Parse each Xianzhi
     {
-        auto succeed = XianjieJson::ParseGroups<true>(jsonRoot, fileName, errorStr,
-            outXianjieFileData.m_xianZhiDataVec,
-            GetSingletonInstance<XianjieJson::XianZhiProcessArrayDesc>(),
-            &outXianjieFileData.m_loopUpXainZhi, &outXianjieFileData.m_loopUpXainlv,
-            &XianZhiData::xianlvName, &XianZhiData::pXianlv);
+        auto succeed =
+            JsonUtils::ParseGroups<true>(jsonRoot, fileName, errorStr, out.m_xianZhiDataVec,
+                GetSingletonInstance<XianjieJson::XianZhiProcessArrayDesc>(), &out.m_loopUpXainZhi,
+                &out.m_loopUpXainLv, &XianZhiData::xianlvName, &XianZhiData::pXianlv);
         if (!succeed)
             return false;
     }
 
     // Parse Xianre unit scale
     {
-        auto it = jsonRoot.find(XianjieJson::k_xianrenKey_baseUnitScale);
+        auto it = jsonRoot.find(XianjieJson::k_key_baseUnitScale);
         if (it == jsonRoot.end() || !it->is_string())
         {
-            errorStr += StringFormat::FormatString(u8"文件: ", fileName, u8" 缺少有效的: ",
-                XianjieJson::k_xianrenKey_baseUnitScale, "\n");
+            errorStr += FormatString(
+                u8"文件: ", fileName, u8" 缺少有效的: ", XianjieJson::k_key_baseUnitScale, "\n");
             return false;
         }
-        auto unitScaleStr                         = it->get<std::string>();
-        outXianjieFileData.m_xianrenBaseUnitScale = UnitScale::GetEnumFromStr(unitScaleStr);
+        auto unitScaleStr = it->get<std::string>();
+        out.m_unitScale   = UnitScale::GetEnumFromStr(unitScaleStr);
 
         // Check if it is valid
-        if (!UnitScale::IsValid(outXianjieFileData.m_xianrenBaseUnitScale))
+        if (!UnitScale::IsValid(out.m_unitScale))
         {
-            errorStr += StringFormat::FormatString(u8"文件: ", fileName, u8" 中的: ",
-                XianjieJson::k_xianrenKey_baseUnitScale, u8", 其值为: ", unitScaleStr,
-                u8", 不是有效的单位\n");
+            errorStr +=
+                FormatString(u8"文件: ", fileName, u8" 中的: ", XianjieJson::k_key_baseUnitScale,
+                    u8", 其值为: ", unitScaleStr, u8", 不是有效的单位\n");
             return false;
         }
     }
 
     // Parse each Xianren
     {
-        auto succeed = XianjieJson::ParseGroups<true>(jsonRoot, fileName, errorStr,
-            outXianjieFileData.m_xianrenDataVec,
-            GetSingletonInstance<XianjieJson::XianRenProcessArrayDesc>(),
-            &outXianjieFileData.m_loopUpXainRen, &outXianjieFileData.m_loopUpXainZhi,
-            &XianRenData::xianZhiName, &XianRenData::pXianzhi);
+        auto succeed =
+            JsonUtils::ParseGroups<true>(jsonRoot, fileName, errorStr, out.m_xianRenDataVec,
+                GetSingletonInstance<XianjieJson::XianRenProcessArrayDesc>(), &out.m_loopUpXainRen,
+                &out.m_loopUpXainZhi, &XianRenData::xianZhiName, &XianRenData::pXianzhi);
         if (!succeed)
             return false;
+
+        // Assign unit scale to each xian ren
+        for (auto& data : out.m_xianRenDataVec)
+            data.baseProp *= out.m_unitScale;
+    }
+
+    // Pase Xianren that need to calculate
+    {
+        auto it = jsonRoot.find(XianjieJson::k_key_calculateXianRenArray);
+        if (it == jsonRoot.end() || !it->is_array())
+        {
+            errorStr += FormatString(u8"文件: ", fileName, u8" 缺少有效的: ",
+                XianjieJson::k_key_calculateXianRenArray, "\n");
+            return false;
+        }
+
+        auto calculateStrArray = it->get<std::vector<std::string>>();
+        if (calculateStrArray.empty())
+        {
+            errorStr += FormatString(u8"文件: ", fileName, u8" 中的: ",
+                XianjieJson::k_key_calculateXianRenArray, u8" 不能为空,如希望计算全部仙人请输入",
+                std::quoted(XianjieJson::k_key_calculateAllXianRen), "\n");
+            return false;
+        }
+
+        if (std::find(calculateStrArray.begin(), calculateStrArray.end(),
+                XianjieJson::k_key_calculateAllXianRen) != calculateStrArray.end())
+        {
+            // Using all Xian Ren
+            const auto& source = out.m_xianRenDataVec;
+            auto& target       = out.m_calcXianRenDataVec;
+
+            target.reserve(source.size());
+            for (const auto& data : source)
+                target.emplace_back(&data);
+        }
+        else
+        {
+            const auto& refTable = out.m_loopUpXainRen;
+            std::unordered_map<std::string, const XianRenData*> uniqueTable;
+            for (const auto& strKey : calculateStrArray)
+            {
+                if (strKey.empty())
+                    continue;
+
+                // Check if str key is valid.
+                auto itRef = refTable.find(strKey);
+                if (itRef == refTable.end())
+                {
+                    errorStr += FormatString(u8"文件: ", fileName, ", ",
+                        XianjieJson::k_key_calculateXianRenArray, u8" 中的属性: ", strKey,
+                        u8" 无效!\n");
+                    assert(false);
+                    return false;
+                }
+
+                // Check if the str key has already been picked.
+                const auto* pData = itRef->second;
+                auto insertedPair = uniqueTable.try_emplace(strKey, pData);
+                if (!insertedPair.second)
+                {
+                    errorStr += FormatString(u8"文件: ", fileName, ", ",
+                        XianjieJson::k_key_calculateXianRenArray, u8" 中的节点: ", pData->name,
+                        u8", 中的属性: ", strKey, u8" 已经被 ", uniqueTable.at(strKey)->name,
+                        u8" 选择!\n");
+                    assert(false);
+                    return false;
+                }
+
+                out.m_calcXianRenDataVec.emplace_back(pData);
+            }
+        }
     }
 
     return true;
 }
 
-void XianjieFileData::Reset()
+void XianJieFileData::Reset()
 {
-    m_xianrenBaseUnitScale = UnitScale::NotValid;
+    m_unitScale = UnitScale::NotValid;
 
-    m_loopUpXainRen.clear();
+    m_loopUpXainLv.clear();
     m_loopUpXainZhi.clear();
-    m_loopUpXainlv.clear();
+    m_loopUpXainRen.clear();
 
-    m_xianrenDataVec.clear();
+    m_calcXianRenDataVec.clear();
+    m_xianRenDataVec.clear();
     m_xianZhiDataVec.clear();
     m_xianLvDataVec.clear();
-    m_touxiangDataVec.clear();
+    m_touXiangDataVec.clear();
 }
 
+void XianRenPropBuff::Reset()
+{
+    li_add       = 0;
+    nian_add     = 0;
+    fu_add       = 0;
+    li_percent   = 0.0;
+    nian_percent = 0.0;
+    fu_percent   = 0.0;
+}
+
+std::string XianRenPropBuff::ToString(const char* prefix) const
+{
+    // clang-format off
+    return FormatString(
+        prefix, u8"力数值: ", li_add,           "\n",
+        prefix, u8"力百分比: ", li_percent,     "\n",
+        prefix, u8"念数值: ", nian_add,         "\n",
+        prefix, u8"念百分比: ", nian_percent,   "\n",
+        prefix, u8"福数值: ", fu_add,           "\n",
+        prefix, u8"福百分比: ", fu_percent,     "\n"
+    );
+    // clang-format on
+}
+
+std::string XianRenProp::ToString() const
+{
+    return FormatString(
+        u8"力: ", li, u8"\n念: ", nian, u8"\n福: ", fu, u8"\n总属性: ", GetSum<PropertyMask::All>(), "\n");
+}
+XianRenProp& XianRenProp::operator*=(UnitScale::Enum unitScale)
+{
+    // Removing tailing fractions.
+    li   = std::round(li * unitScale);
+    nian = std::round(nian * unitScale);
+    fu   = std::round(fu * unitScale);
+    return *this;
+}
 } // namespace GearCalc

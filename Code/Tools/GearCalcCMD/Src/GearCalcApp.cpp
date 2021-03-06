@@ -11,7 +11,7 @@
 #define MAX_FRACTION_DIGITS_TO_PRINT 2
 #include <iomanip>
 
-#include "UserData.h"
+#include "GearCalculator.h"
 
 using namespace JUtils;
 using namespace GearCalc;
@@ -47,13 +47,25 @@ private:
     AppState GetCurrentState()
     {
         char input;
-        std::cout << u8"请输入r计算, q退出, c清屏: " << std::endl;
+        std::cout << u8"请输入数字1到9计算, q退出, c清屏: " << std::endl;
         std::cin >> input;
+
+        m_currentSolution = Calculator::Solution::None;
 
         switch (input)
         {
-        case 'r':
+        case '1':
+        case '2':
+        case '3':
         {
+            int index = std::atoi(&input);
+            --index;
+
+            // Check the range against Calculator::Solution
+            if (index < 0 || index >= static_cast<int>(Calculator::Solution::NumSolutions))
+                return AppState::Idle;
+
+            m_currentSolution = static_cast<Calculator::Solution>(index);
             return AppState::Running;
         }
         case 'q':
@@ -67,30 +79,16 @@ private:
 
     void OnRunningState() override
     {
-
         std::cout << u8"开始计算..." << std::endl;
         m_errorStr.clear();
 
-        XianqiFileData gearFileData;
-        {
-            auto succeed = XianqiFileData::ReadFromJsonFile("XianqiData.json", m_errorStr, gearFileData);
-            if (!succeed)
-            {
-                m_errorStr += u8"加载XianqiData.json文件失败,请检查文件!";
-                return;
-            }
-        }
+        if (!m_calculator.Init("XianjieData.json", "XianqiData.json", m_errorStr))
+            return;
+
+        if (!m_calculator.Run(m_errorStr, m_currentSolution))
+            return;
 
 
-        XianjieFileData xianjieFileData;
-        {
-            auto succeed = XianjieFileData::ReadFromJsonFile("XianjieData.json", m_errorStr, xianjieFileData);
-            if (!succeed)
-            {
-                m_errorStr += u8"加载XianjieData.json文件失败,请检查文件!";
-                return;
-            }
-        }
     }
 
     void OnExitState() override { std::cout << u8"关闭..." << std::endl; }
@@ -114,6 +112,9 @@ private:
     }
 
 private:
+    Calculator m_calculator;
+    Calculator::Solution m_currentSolution = Calculator::Solution::None;
+
     std::string m_errorStr;
 };
 

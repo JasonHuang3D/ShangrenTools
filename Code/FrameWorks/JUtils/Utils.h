@@ -6,13 +6,53 @@
 #include <array>
 #include <chrono>
 #include <functional>
+#include <iomanip>
 #include <sstream>
 #include <string>
 #include <type_traits>
 #include <vector>
 
+template <typename EnumType, typename = typename std::enable_if_t<std::is_enum_v<EnumType>>>
+using TUnderLyingEnum = typename std::underlying_type<EnumType>::type;
+#define DEFINE_FLAG_ENUM_OPERATORS(ENUMTYPE)                                                       \
+    inline ENUMTYPE& operator|=(ENUMTYPE& a, ENUMTYPE b)                                           \
+    {                                                                                              \
+        return reinterpret_cast<ENUMTYPE&>(reinterpret_cast<TUnderLyingEnum<ENUMTYPE>&>(a) |=      \
+            static_cast<TUnderLyingEnum<ENUMTYPE>>(b));                                            \
+    }                                                                                              \
+    inline ENUMTYPE& operator&=(ENUMTYPE& a, ENUMTYPE b)                                           \
+    {                                                                                              \
+        return reinterpret_cast<ENUMTYPE&>(reinterpret_cast<TUnderLyingEnum<ENUMTYPE>&>(a) &=      \
+            static_cast<TUnderLyingEnum<ENUMTYPE>>(b));                                            \
+    }                                                                                              \
+    inline ENUMTYPE& operator^=(ENUMTYPE& a, ENUMTYPE b)                                           \
+    {                                                                                              \
+        return reinterpret_cast<ENUMTYPE&>(reinterpret_cast<TUnderLyingEnum<ENUMTYPE>&>(a) ^=      \
+            static_cast<TUnderLyingEnum<ENUMTYPE>>(b));                                            \
+    }                                                                                              \
+    inline constexpr ENUMTYPE operator|(ENUMTYPE a, ENUMTYPE b)                                    \
+    {                                                                                              \
+        return static_cast<ENUMTYPE>(static_cast<TUnderLyingEnum<ENUMTYPE>>(a) |                   \
+            static_cast<TUnderLyingEnum<ENUMTYPE>>(b));                                            \
+    }                                                                                              \
+    inline constexpr ENUMTYPE operator&(ENUMTYPE a, ENUMTYPE b)                                    \
+    {                                                                                              \
+        return static_cast<ENUMTYPE>(static_cast<TUnderLyingEnum<ENUMTYPE>>(a) &                   \
+            static_cast<TUnderLyingEnum<ENUMTYPE>>(b));                                            \
+    }                                                                                              \
+    inline constexpr ENUMTYPE operator^(ENUMTYPE a, ENUMTYPE b)                                    \
+    {                                                                                              \
+        return static_cast<ENUMTYPE>(static_cast<TUnderLyingEnum<ENUMTYPE>>(a) ^                   \
+            static_cast<TUnderLyingEnum<ENUMTYPE>>(b));                                            \
+    }                                                                                              \
+    inline constexpr ENUMTYPE operator~(ENUMTYPE a)                                                \
+    {                                                                                              \
+        return static_cast<ENUMTYPE>(~static_cast<TUnderLyingEnum<ENUMTYPE>>(a));                  \
+    }
+
 namespace JUtils
 {
+
 // Accepts std::string std::wstring, etc.
 template <typename T>
 std::vector<T> TockenizeString(const T& str, const T& delimiters)
@@ -35,34 +75,14 @@ std::vector<T> TockenizeString(const T& str, const T& delimiters)
     return v;
 }
 
-struct StringFormat
+template <typename... TRest>
+static std::string FormatString(TRest&&... args)
 {
-private:
-    template <typename TStringStream>
-    static void FormatStr(TStringStream& ss)
-    {
-    }
-    template <typename TStringStream, typename T>
-    static void FormatStr(TStringStream& ss, const T& arg)
-    {
-        ss << arg;
-    }
-    template <typename TStringStream, typename THead, typename... TRest>
-    static void FormatStr(TStringStream& ss, const THead& headArg, const TRest&... restArgs)
-    {
-        FormatStr(ss, headArg);
-        FormatStr(ss, restArgs...);
-    }
-
-public:
-    template <typename... TRest>
-    static std::string FormatString(const TRest&... args)
-    {
-        std::stringstream ss;
-        FormatStr(ss, args...);
-        return ss.str();
-    }
-};
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(2);
+    (ss << ... << std::forward<TRest>(args));
+    return ss.str();
+}
 
 template <typename TypeFloat, typename TypeInt>
 TypeFloat FormatIntToFloat(TypeInt value, TypeInt scale)
@@ -80,24 +100,17 @@ constexpr std::uint32_t GetInvalidValue(std::uint32_t numBits)
 }
 
 // Helper function to compute and combine hash value
-template <typename T>
-void HashCombine(std::size_t& seed, const T& value)
+template <typename TypeFirst, typename... TypeRest>
+void HashCombine(std::size_t& seed, const TypeFirst& v, TypeRest&&... rest)
 {
-    seed ^= std::hash<T>()(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    seed ^= std::hash<TypeFirst>()(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    (HashCombine(seed, std::forward<TypeRest>(rest)), ...);
 }
-
-template <typename TypeFirstArg, typename... TypeRestArgs>
-void HashCombine(std::size_t& seed, const TypeFirstArg& firstArg, const TypeRestArgs&... restArgs)
-{
-    HashCombine(seed, firstArg);
-    HashCombine(seed, restArgs...);
-}
-
 template <typename... TyepArgs>
-std::size_t ComputeHash(const TyepArgs&... args)
+std::size_t ComputeHash(TyepArgs&&... args)
 {
     std::size_t seed = 0;
-    HashCombine(seed, args...);
+    HashCombine(seed, std::forward<TyepArgs>(args)...);
     return seed;
 }
 
@@ -179,14 +192,55 @@ public:
     typedef decltype(get_type(static_cast<TypeMemberPtr>(nullptr))) Type;
 };
 
-
-
 // Simple helper function for singleton types.
-template<typename T>
+template <typename T>
 T& GetSingletonInstance()
 {
     static T s_instance;
     return s_instance;
 }
+
+// Call back signature: void(const std::vector<std::size_t>& combIndexVec, std::size_t indexOfComb)
+template <typename TypeCallBack>
+std::size_t SelectCombination(
+    std::size_t numElelment, std::size_t numSelect, TypeCallBack&& callBack)
+{
+    if (numElelment < numSelect)
+    {
+        assert(false);
+        return 0;
+    }
+
+    std::vector<std::size_t> inputIndices(numElelment);
+    for (std::size_t i = 0; i < numElelment; ++i)
+        inputIndices[i] = i;
+
+    std::vector<std::size_t> stack(numSelect);
+    std::size_t numCombs = 0;
+    const std::size_t kEnd = numElelment - numSelect;
+    auto combRecursion =
+        LambdaCombinator([&](auto& selfLambda, std::size_t offset, std::size_t stackIndex) -> void {
+            if (stackIndex == numSelect)
+            {
+                if constexpr (!std::is_same_v<TypeCallBack, std::nullptr_t>)
+                {
+                    std::forward<TypeCallBack>(callBack)(stack, numCombs);
+                }
+                ++numCombs;
+                return;
+            }
+
+            auto endIndex = kEnd + stackIndex;
+            for (std::size_t i = offset; i <= endIndex; ++i)
+            {
+                stack[stackIndex] = inputIndices[i];
+                selfLambda(i + 1, stackIndex + 1);
+            }
+        });
+
+    combRecursion(0, 0);
+    return numCombs;
+}
+std::size_t GetNumOfSelectionComb(std::size_t numElelment, std::size_t numSelect);
 
 } // namespace JUtils

@@ -104,7 +104,7 @@ add_subdirectory(ThirdParty)
 add_subdirectory(Code)
 
 # Config visual studio default startup project
-set(start_up_project TianyuanCalc)
+set(start_up_project TianyuanCalcCMD)
 if(TARGET ${start_up_project})
     set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${start_up_project})
 endif()

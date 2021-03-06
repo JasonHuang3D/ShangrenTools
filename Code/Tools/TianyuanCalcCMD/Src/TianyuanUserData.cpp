@@ -4,7 +4,7 @@
 
 #include "JUtils/pch.h"
 
-#include "UserData.h"
+#include "TianyuanUserData.h"
 
 #include "JUtils/Utils.h"
 
@@ -59,7 +59,7 @@ bool UserDataList::ReadFromFile(
             }
             else
             {
-                errorStr += StringFormat::FormatString(
+                errorStr += FormatString(
                     u8"文件: ", fileName, u8" 第 ", currentLineNum, u8" 行出错，请确保输入格式!\n");
                 return false;
             }
@@ -70,7 +70,7 @@ bool UserDataList::ReadFromFile(
         if (list.empty())
         {
             errorStr +=
-                StringFormat::FormatString(u8"文件: ", fileName, u8" 没有解析到任何有效条目数!\n");
+                FormatString(u8"文件: ", fileName, u8" 没有解析到任何有效条目数!\n");
             return false;
         }
 
@@ -80,7 +80,7 @@ bool UserDataList::ReadFromFile(
     else
     {
         errorStr +=
-            StringFormat::FormatString(u8"文件: ", fileName, u8" 无法打开，请检查文件名和路径!\n");
+           FormatString(u8"文件: ", fileName, u8" 无法打开，请检查文件名和路径!\n");
         return false;
     }
 }

@@ -4,7 +4,7 @@
 
 #include "JUtils/pch.h"
 
-#include "Calculator.h"
+#include "TianyuanCalculator.h"
 
 #include "JUtils/Utils.h"
 
@@ -533,7 +533,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
 
 #ifdef M_DEBUG
         {
-            auto str = StringFormat::FormatString("inputSum: ", inputSum, " targetSum: ", targetSum,
+            auto str = FormatString("inputSum: ", inputSum, " targetSum: ", targetSum,
                 "\noriginalTargetSize: ", originalTargetSize,
                 " optimizedTargetSize: ", optimizedTargetSize);
             std::cout << str << std::endl;
@@ -679,12 +679,12 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
             std::fill(stackIndexResult.begin(), stackIndexResult.end(), kInvalidIndex);
 
             auto outputPath = [&](std::uint32_t maxNumFinishedTarget, float exeedSum) -> void {
+                std::lock_guard lock(recordResultMutex);
                 bool needToRecord = maxNumFinishedTarget > refMaxNumFinishedTarget ||
-                    (exeedSum < refMinExeedSum && maxNumFinishedTarget >= refMaxNumFinishedTarget);
+                    (exeedSum <= refMinExeedSum && maxNumFinishedTarget >= refMaxNumFinishedTarget);
 
                 if (needToRecord)
                 {
-                    std::lock_guard lock(recordResultMutex);
                     refMaxNumFinishedTarget = maxNumFinishedTarget;
                     refMinExeedSum          = exeedSum;
 
@@ -761,10 +761,11 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
 
                     const auto& currentCombVec = allCombVec[targetIndex];
                     // Skip if exeed sum already greater than the sum of previous full path.
+                    const auto _refMinExeedSum = refMinExeedSum;
                     auto endCombIndex =
                         std::upper_bound(currentCombVec.begin(), currentCombVec.end(), prevExeed,
-                            [&](float prevSum, const Algorithms::OutputCombination& comb) -> bool {
-                                return comb.diff + prevSum > refMinExeedSum;
+                            [=](float prevSum, const Algorithms::OutputCombination& comb) -> bool {
+                                return comb.diff + prevSum > _refMinExeedSum;
                             }) -
                         currentCombVec.begin();
 

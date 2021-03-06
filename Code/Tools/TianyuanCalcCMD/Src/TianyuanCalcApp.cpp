@@ -8,13 +8,13 @@
 #include "JUtils/Main.h"
 #include "JUtils/Utils.h"
 
-#include "UserData.h"
+#include "TianyuanUserData.h"
 
 #define MAX_FRACTION_DIGITS_TO_PRINT 2
 
 #define MAX_INPUT_SIZE 64
 #define MAX_COMB_NUM_BIT 32
-#include "Calculator.h"
+#include "TianyuanCalculator.h"
 
 #include <iomanip>
 
@@ -41,7 +41,6 @@ void PrintInputData(std::uint32_t printIndex, const UserData* pUserData, std::ui
               << FormatIntToFloat<double>(pUserData->GetOriginalData(), unitScale)
               << UnitScale::GetUnitStr(unitScale) << std::endl;
 }
-
 } // namespace
 
 class TianyuanCalcApp : public CmdAppBase
