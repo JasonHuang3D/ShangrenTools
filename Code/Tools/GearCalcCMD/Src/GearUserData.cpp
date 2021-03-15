@@ -9,7 +9,7 @@
 #include "JUtils/Utils.h"
 #include "nlohmann/json.hpp"
 
-#include <cmath>
+#include <execution>
 #include <fstream>
 #include <functional>
 #include <iomanip>
@@ -263,22 +263,22 @@ const JsonProcessMap& GetJsonProcessMap()
             nullptr, &XianlvData::tianfu_global_buff,
             nullptr);
 
-        configMap(u8"产晶数值", &ChanYeBuff::chanJing_add, 
+        configMap(u8"产晶数值", &ChanyePropBuff::chanJing_add, 
             &GearData::chanyeBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_chanye_buff,
             nullptr);
-        configMap(u8"产能数值", &ChanYeBuff::chanNeng_add,
+        configMap(u8"产能数值", &ChanyePropBuff::chanNeng_add,
             &GearData::chanyeBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_chanye_buff,
             nullptr);
-        configMap(u8"产晶百分比", &ChanYeBuff::chanjing_percent,
+        configMap(u8"产晶百分比", &ChanyePropBuff::chanJing_percent,
             &GearData::chanyeBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_chanye_buff,
             nullptr);
-        configMap(u8"产能百分比", &ChanYeBuff::chanNeng_percent, 
+        configMap(u8"产能百分比", &ChanyePropBuff::chanNeng_percent, 
             &GearData::chanyeBuff,
             nullptr,
             nullptr, &XianlvData::tianfu_chanye_buff,
@@ -305,7 +305,8 @@ const JsonProcessMap& GetJsonProcessMap()
 
 struct ProcessSelector
 {
-    using CallBackType = std::function<bool(const std::string&, const Json&, std::string&, void*)>;
+    using CallBackType = std::function<bool(
+        const std::string&, const Json&, JsonProcessOpType::Enum, std::string&, void*)>;
 
     ProcessSelector(TargetProcessType::Enum targetProcessType,
         JsonProcessOpType::Enum processOpType, bool isRequired = true) :
@@ -345,8 +346,8 @@ struct ProcessSelectorCallBackWrapper
     ProcessSelectorCallBackWrapper(TypeValue TypeData::*dataMemberPtr, const char* desiredKey) :
         dataMemberPtr(dataMemberPtr), desiredKey(desiredKey) {};
 
-    bool operator()(
-        const std::string& jsonKey, const Json& jsonValue, std::string& errorStr, void* pData)
+    bool operator()(const std::string& jsonKey, const Json& jsonValue,
+        JsonProcessOpType::Enum operatorType, std::string& errorStr, void* pData)
     {
         if (jsonKey != desiredKey)
         {
@@ -357,8 +358,21 @@ struct ProcessSelectorCallBackWrapper
 
         if ((jsonValue.*TypeCheckFuncPtr)())
         {
-            auto* pTypedData           = reinterpret_cast<TypeData*>(pData);
-            pTypedData->*dataMemberPtr = jsonValue.get<TypeValue>();
+            auto* pTypedData = reinterpret_cast<TypeData*>(pData);
+
+            switch (operatorType)
+            {
+            case JsonProcessOpType::Assign:
+                pTypedData->*dataMemberPtr = jsonValue.get<TypeValue>();
+                break;
+            case JsonProcessOpType::Increase:
+                pTypedData->*dataMemberPtr += jsonValue.get<TypeValue>();
+                break;
+            default:
+                errorStr += FormatString(jsonKey, " invalid operator type!\n");
+                assert(false);
+                return false;
+            }
             return true;
         }
         else
@@ -419,7 +433,8 @@ bool ParseJsonArray(const JsonArrayDescBase& desc, const char* fileName, const J
 
             if (processSelector.callBack)
             {
-                if (processSelector.callBack(propGroupKey, propGroupValue, errorStr, pData))
+                if (processSelector.callBack(propGroupKey, propGroupValue,
+                        processSelector.processOpType, errorStr, pData))
                 {
                     outHasValue = true;
                     return true;
@@ -444,7 +459,8 @@ bool ParseJsonArray(const JsonArrayDescBase& desc, const char* fileName, const J
 
                 if (processSelector.callBack)
                 {
-                    processSelector.callBack(prop.key(), prop.value(), errorStr, pData);
+                    processSelector.callBack(
+                        prop.key(), prop.value(), processSelector.processOpType, errorStr, pData);
                     continue;
                 }
 
@@ -524,7 +540,7 @@ bool ParseJsonArray(const JsonArrayDescBase& desc, const char* fileName, const J
                     else
                     {
                         errorStr += FormatString(keyOfArray, ": ", element.key(), u8", 组: ",
-                            propGroup.key(), u8" 包含未知组名\n");
+                            propGroup.key(), u8" 是未知组名\n");
                         assert(false);
                         return false;
                     }
@@ -700,6 +716,75 @@ bool ParseGroups(const Json& jsonRoot, const char* fileName, std::string& errorS
     return true;
 };
 
+template <typename TypeSource>
+bool ParseRequiredCalcElements(const Json& jsonRoot, const char* arrayKey,
+    const std::unordered_map<std::string, const TypeSource* const>& sourceLoopUp,
+    std::vector<const TypeSource*>& targetVec, const char* fileName, std::string& errorStr)
+{
+    static constexpr auto kAllKey = "ALL";
+
+    auto itJson = jsonRoot.find(arrayKey);
+    if (itJson == jsonRoot.end() || !itJson->is_array())
+    {
+        errorStr += FormatString(
+            u8"文件: ", std::quoted(fileName), u8" 缺少有效的: ", std::quoted(arrayKey), "\n");
+        return false;
+    }
+
+    auto calculateStrArray = itJson->get<std::vector<std::string>>();
+    if (calculateStrArray.empty())
+    {
+        errorStr += FormatString(u8"文件: ", std::quoted(fileName), u8" 中的: ",
+            std::quoted(arrayKey), u8" 不能为空,如希望计算全部请输入", std::quoted(kAllKey), "\n");
+        return false;
+    }
+
+    if (std::find(calculateStrArray.begin(), calculateStrArray.end(), kAllKey) !=
+        calculateStrArray.end())
+    {
+        // Using all Xian Ren
+        targetVec.reserve(sourceLoopUp.size());
+        for (auto& it : sourceLoopUp)
+        {
+            targetVec.emplace_back(it.second);
+        }
+    }
+    else
+    {
+        std::unordered_map<std::string, const TypeSource*> uniqueTable;
+        for (const auto& strKey : calculateStrArray)
+        {
+            if (strKey.empty())
+                continue;
+
+            // Check if str key is valid.
+            auto itRef = sourceLoopUp.find(strKey);
+            if (itRef == sourceLoopUp.end())
+            {
+                errorStr += FormatString(u8"文件: ", std::quoted(fileName), ", ",
+                    std::quoted(arrayKey), u8" 中的属性: ", strKey, u8" 无效!\n");
+                assert(false);
+                return false;
+            }
+
+            // Check if the str key has already been picked.
+            const auto* pData = itRef->second;
+            auto insertedPair = uniqueTable.try_emplace(strKey, pData);
+            if (!insertedPair.second)
+            {
+                errorStr += FormatString(u8"文件: ", std::quoted(fileName), ", ",
+                    std::quoted(arrayKey), u8" 中的节点: ", pData->name, u8", 中的属性: ", strKey,
+                    u8" 已经被 ", uniqueTable.at(strKey)->name, u8" 选择!\n");
+                assert(false);
+                return false;
+            }
+
+            targetVec.emplace_back(pData);
+        }
+    }
+
+    return true;
+}
 } // namespace JsonUtils
 
 namespace GearJson
@@ -721,7 +806,8 @@ struct XianqiProcessArrayDesc : public JsonUtils::JsonArrayDescBase
         return s_outMap;
     }
 };
-constexpr auto k_gearKey_numEquip = u8"仙器佩戴数量";
+constexpr auto k_gearKey_numEquip          = u8"仙器佩戴数量";
+constexpr auto k_key_calculateXianQi_array = u8"参与运算仙器";
 } // namespace GearJson
 
 namespace XianjieJson
@@ -772,7 +858,7 @@ struct XianZhiProcessArrayDesc : public JsonUtils::JsonArrayDescBase
             static constexpr auto k_key = u8"辅事";
             s_outMap.try_emplace(k_key,
 
-                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::NumOps,
+                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Assign,
                 JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_string, XianZhiData,
                     std::string>(&XianZhiData::xianlvName, k_key),
                 false // False means this key is optional in Json file.
@@ -781,6 +867,7 @@ struct XianZhiProcessArrayDesc : public JsonUtils::JsonArrayDescBase
         return s_outMap;
     }
 };
+
 struct XianRenProcessArrayDesc : public JsonUtils::JsonArrayDescBase
 {
     const char* GetKeyOfArray() const override { return u8"仙人"; }
@@ -795,7 +882,7 @@ struct XianRenProcessArrayDesc : public JsonUtils::JsonArrayDescBase
             static constexpr auto k_key = u8"仙职";
             s_outMap.try_emplace(k_key,
 
-                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::NumOps,
+                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Assign,
                 JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_string, XianRenData,
                     std::string>(&XianRenData::xianZhiName, k_key),
                 false // False means this key is optional in Json file.
@@ -805,11 +892,160 @@ struct XianRenProcessArrayDesc : public JsonUtils::JsonArrayDescBase
     }
 };
 
-constexpr auto k_key_baseUnitScale         = u8"仙人基础属性单位";
-constexpr auto k_key_calculateXianRenArray = u8"参与运算仙人";
-constexpr auto k_key_calculateAllXianRen   = "ALL";
+struct ChanyeFieldArrayDescBase : public JsonUtils::JsonArrayDescBase
+{
+    const JsonUtils::PropGroupsToProcessSelectorMapType& GetGroupProcessMap() const override
+    {
+        static JsonUtils::PropGroupsToProcessSelectorMapType s_outMap;
+        static constexpr auto k_key_chanye_level_buff  = u8"产业等级百分比";
+        static constexpr auto k_key_chanye_zaohua_buff = u8"造化百分比";
+        if (s_outMap.empty())
+        {
+            // ChanyeFieldData::selfBuff = k_key_chanye_level_buff + k_key_chanye_zaohua_buff
+
+            s_outMap.try_emplace(k_key_chanye_level_buff,
+
+                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Assign,
+                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number, ChanyeFieldData,
+                    double>(&ChanyeFieldData::selfBuff, k_key_chanye_level_buff),
+                true // true means this key is required in Json file.
+            );
+
+            s_outMap.try_emplace(k_key_chanye_zaohua_buff,
+
+                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Increase,
+                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number, ChanyeFieldData,
+                    double>(&ChanyeFieldData::selfBuff, k_key_chanye_zaohua_buff),
+                true // true means this key is required in Json file.
+            );
+        }
+        return s_outMap;
+    }
+};
+
+struct ChanyeJingFieldDesc : public ChanyeFieldArrayDescBase
+{
+    const char* GetKeyOfArray() const override { return u8"产晶"; }
+};
+struct ChanyeNengFieldDesc : public ChanyeFieldArrayDescBase
+{
+    const char* GetKeyOfArray() const override { return u8"产能"; }
+};
+
+constexpr auto k_key_baseUnitScale = u8"仙人基础属性单位";
+
+constexpr auto k_key_calculateXianRen_array = u8"参与运算仙人";
+
+constexpr auto k_key_chanye_obj     = u8"产业";
+constexpr auto k_key_chanyeInterval = u8"收益间隔";
 
 } // namespace XianjieJson
+
+using ChanyeFiledOpMapType = std::unordered_map<std::string, ChanyeFieldInfo>;
+using ChanyeFieldTableType = std::array<ChanyeFiledOpMapType, ChanyeFieldCategory::NumCategory>;
+const ChanyeFieldTableType& GetChanyeTable()
+{
+    // clang-format off
+    static ChanyeFieldTableType s_table{ {
+            // ChanJing
+            {
+               {
+                   u8"仙矿开采",
+                   {
+                       2,
+                       [](const XianRenProp& xianRenProp) -> double
+                       {
+                          return std::trunc(xianRenProp.li * 0.3);
+                       }
+                   }
+               },
+
+               {
+                   u8"仙材种植",
+                   {
+                       3,
+                       [](const XianRenProp& xianRenProp) -> double
+                       {
+                           return std::trunc(xianRenProp.li * 0.03)
+                               + std::trunc(xianRenProp.nian * 0.18);
+                       }
+                   }
+               },
+
+               {
+                   u8"仙器炼制",
+                   {
+                       4,
+                       [](const XianRenProp& xianRenProp) -> double
+                       {
+                           return std::trunc(xianRenProp.li * 0.16)
+                               + std::trunc(xianRenProp.nian * 0.05);
+                       }
+                   }
+               },
+
+               {
+                   u8"仙界商行",
+                   {
+                       5,
+                       [](const XianRenProp& xianRenProp) -> double
+                       {
+                           return std::trunc(xianRenProp.li * 0.07)
+                               + std::trunc(xianRenProp.nian * 0.07)
+                               + std::trunc(xianRenProp.fu * 0.07);
+                       }
+                   }
+               },
+
+               {
+                   u8"绝地寻宝",
+                   {
+                       7,
+                       [](const XianRenProp& xianRenProp) -> double
+                       {
+                           return std::trunc(xianRenProp.li * 0.05)
+                               + std::trunc(xianRenProp.nian * 0.05)
+                               + std::trunc(xianRenProp.fu * 0.25);
+                       }
+                   }
+               }
+
+           },
+
+        // ChanNeng
+        {
+            {
+                u8"聚元仙阵",
+                {
+                    1,
+                    [](const XianRenProp& xianRenProp) -> double
+                    {
+                        return std::trunc(xianRenProp.nian * 0.3);
+                    }
+                }
+            },
+
+            {
+                u8"传道仙馆",
+                {
+                    6,
+                    [](const XianRenProp& xianRenProp) -> double
+                    {
+                        return std::trunc(xianRenProp.li * 0.14)
+                            + std::trunc(xianRenProp.nian * 0.02)
+                            + std::trunc(xianRenProp.fu * 0.14);
+                    }
+                }
+            }
+
+        }
+
+
+    } };
+    // clang-format on
+    return s_table;
+}
+
 } // namespace
 
 namespace GearCalc
@@ -846,11 +1082,21 @@ bool XianQiFileData::ReadFromJsonFile(
             return false;
     }
 
+    // Pase gears that need to calculate
+    {
+        auto succeed =
+            JsonUtils::ParseRequiredCalcElements(jsonRoot, GearJson::k_key_calculateXianQi_array,
+                out.m_loopUpGears, out.m_calcGearsVec, fileName, errorStr);
+        if (!succeed)
+            return false;
+    }
+
     return true;
 }
 
 void XianQiFileData::Reset()
 {
+    m_calcGearsVec.clear();
     m_maxNumEquip = 0;
     m_loopUpGears.clear();
     m_gearsDataVec.clear();
@@ -929,72 +1175,114 @@ bool XianJieFileData::ReadFromJsonFile(
             data.baseProp *= out.m_unitScale;
     }
 
-    // Pase Xianren that need to calculate
+    // Parse chan ye
     {
-        auto it = jsonRoot.find(XianjieJson::k_key_calculateXianRenArray);
-        if (it == jsonRoot.end() || !it->is_array())
+        // Get chan ye Json obj
+        auto chanyeObjIt = jsonRoot.find(XianjieJson::k_key_chanye_obj);
+        if (chanyeObjIt == jsonRoot.end() || !chanyeObjIt->is_object())
         {
-            errorStr += FormatString(u8"文件: ", fileName, u8" 缺少有效的: ",
-                XianjieJson::k_key_calculateXianRenArray, "\n");
+            errorStr += FormatString(
+                u8"文件: ", fileName, u8" 缺少有效的: ", XianjieJson::k_key_chanye_obj, "\n");
             return false;
         }
 
-        auto calculateStrArray = it->get<std::vector<std::string>>();
-        if (calculateStrArray.empty())
-        {
-            errorStr += FormatString(u8"文件: ", fileName, u8" 中的: ",
-                XianjieJson::k_key_calculateXianRenArray, u8" 不能为空,如希望计算全部仙人请输入",
-                std::quoted(XianjieJson::k_key_calculateAllXianRen), "\n");
-            return false;
-        }
+        const auto& chanyeObj = chanyeObjIt.value();
 
-        if (std::find(calculateStrArray.begin(), calculateStrArray.end(),
-                XianjieJson::k_key_calculateAllXianRen) != calculateStrArray.end())
+        // Parse chanye interval
         {
-            // Using all Xian Ren
-            const auto& source = out.m_xianRenDataVec;
-            auto& target       = out.m_calcXianRenDataVec;
-
-            target.reserve(source.size());
-            for (const auto& data : source)
-                target.emplace_back(&data);
-        }
-        else
-        {
-            const auto& refTable = out.m_loopUpXainRen;
-            std::unordered_map<std::string, const XianRenData*> uniqueTable;
-            for (const auto& strKey : calculateStrArray)
+            // Currently not needed.
+#if 0
+            auto it = chanyeObj.find(XianjieJson::k_key_chanyeInterval);
+            if (it == chanyeObj.end() || !it->is_number())
             {
-                if (strKey.empty())
-                    continue;
+                errorStr += FormatString(u8"文件: ", fileName, u8" 缺少有效的: ",
+                    XianjieJson::k_key_chanyeInterval, "\n");
+                return false;
+            }
+            out.m_chanyeInterval = it->get<double>();
 
-                // Check if str key is valid.
-                auto itRef = refTable.find(strKey);
-                if (itRef == refTable.end())
+            // Chan ye interval can not be negative
+            if (out.m_chanyeInterval < 0.0)
+            {
+                errorStr += FormatString(XianjieJson::k_key_chanyeInterval, " 不能为负数!\n");
+                return false;
+            }
+#endif
+        }
+
+        // Parse each chanye field
+        {
+            auto postProcessChanye = [&](ChanyeFieldCategory::Enum chanyeType,
+                                         std::vector<ChanyeFieldData>& chanyeVec) -> bool {
+                const auto& chanyeTable = GetChanyeTable();
+                const auto& chanyeMap   = chanyeTable[chanyeType];
+
+                // Check every chanye is valid
+                std::unordered_set<std::string> uniqueTable;
+                for (auto& chanyeFieldData : chanyeVec)
                 {
-                    errorStr += FormatString(u8"文件: ", fileName, ", ",
-                        XianjieJson::k_key_calculateXianRenArray, u8" 中的属性: ", strKey,
-                        u8" 无效!\n");
-                    assert(false);
-                    return false;
+                    auto it = chanyeMap.find(chanyeFieldData.name);
+                    if (it == chanyeMap.end())
+                    {
+                        errorStr += FormatString(u8"产业: ", std::quoted(chanyeFieldData.name),
+                            u8" 不是有效的产业名称\n");
+                        assert(false);
+                        return false;
+                    }
+
+                    auto insertedPair = uniqueTable.emplace(chanyeFieldData.name);
+                    if (!insertedPair.second)
+                    {
+                        errorStr += FormatString(
+                            u8"产业: ", std::quoted(chanyeFieldData.name), u8" 不能重复\n");
+                        assert(false);
+                        return false;
+                    }
+
+                    // Assign chanyeInfo
+                    chanyeFieldData.chanyeInfo = it->second;
                 }
 
-                // Check if the str key has already been picked.
-                const auto* pData = itRef->second;
-                auto insertedPair = uniqueTable.try_emplace(strKey, pData);
-                if (!insertedPair.second)
-                {
-                    errorStr += FormatString(u8"文件: ", fileName, ", ",
-                        XianjieJson::k_key_calculateXianRenArray, u8" 中的节点: ", pData->name,
-                        u8", 中的属性: ", strKey, u8" 已经被 ", uniqueTable.at(strKey)->name,
-                        u8" 选择!\n");
-                    assert(false);
-                    return false;
-                }
+                std::sort(std::execution::par_unseq, chanyeVec.begin(), chanyeVec.end(),
+                    [](const ChanyeFieldData& a, const ChanyeFieldData& b) {
+                        return a.chanyeInfo.index < b.chanyeInfo.index;
+                    });
 
-                out.m_calcXianRenDataVec.emplace_back(pData);
+                return true;
+            };
+
+            // Parse ChanJing
+            {
+                auto succeed = JsonUtils::ParseJsonArray<true, false>(
+                    GetSingletonInstance<XianjieJson::ChanyeJingFieldDesc>(), fileName, chanyeObj,
+                    errorStr, out.m_chanJingFiledVec);
+                if (!succeed)
+                    return false;
+
+                // Check if all data are valid.
+                postProcessChanye(ChanyeFieldCategory::ChanJing, out.m_chanJingFiledVec);
+            }
+            // Parse ChanNeng
+            {
+                auto succeed = JsonUtils::ParseJsonArray<true, false>(
+                    GetSingletonInstance<XianjieJson::ChanyeNengFieldDesc>(), fileName, chanyeObj,
+                    errorStr, out.m_chanNengFiledVec);
+                if (!succeed)
+                    return false;
+
+                // Check if all data are valid.
+                postProcessChanye(ChanyeFieldCategory::ChanNeng, out.m_chanNengFiledVec);
             }
         }
+    }
+
+    // Pase Xianren that need to calculate
+    {
+        auto succeed = JsonUtils::ParseRequiredCalcElements(jsonRoot,
+            XianjieJson::k_key_calculateXianRen_array, out.m_loopUpXainRen,
+            out.m_calcXianRenDataVec, fileName, errorStr);
+        if (!succeed)
+            return false;
     }
 
     return true;
@@ -1003,12 +1291,14 @@ bool XianJieFileData::ReadFromJsonFile(
 void XianJieFileData::Reset()
 {
     m_unitScale = UnitScale::NotValid;
-
+    m_calcXianRenDataVec.clear();
     m_loopUpXainLv.clear();
     m_loopUpXainZhi.clear();
     m_loopUpXainRen.clear();
 
-    m_calcXianRenDataVec.clear();
+    m_chanNengFiledVec.clear();
+    m_chanJingFiledVec.clear();
+
     m_xianRenDataVec.clear();
     m_xianZhiDataVec.clear();
     m_xianLvDataVec.clear();
@@ -1039,10 +1329,36 @@ std::string XianRenPropBuff::ToString(const char* prefix) const
     // clang-format on
 }
 
+void ChanyePropBuff::Reset()
+{
+    chanJing_add     = 0;
+    chanNeng_add     = 0;
+    chanJing_percent = 0.0;
+    chanNeng_percent = 0.0;
+}
+
+std::string ChanyePropBuff::ToString() const
+{
+    // clang-format off
+    return FormatString(
+         u8"产晶数值: ", chanJing_add, "\n",
+         u8"产晶百分比: ", chanJing_percent, "\n",
+         u8"产能数值: ", chanNeng_add, "\n",
+         u8"产能百分比: ", chanNeng_percent, "\n"
+    );
+    // clang-format on
+}
+
 std::string XianRenProp::ToString() const
 {
-    return FormatString(
-        u8"力: ", li, u8"\n念: ", nian, u8"\n福: ", fu, u8"\n总属性: ", GetSum<PropertyMask::All>(), "\n");
+    return FormatString(u8"力: ", li, u8"\n念: ", nian, u8"\n福: ", fu, u8"\n总属性: ",
+        GetSum<XianRenPropertyMask::All>(), "\n");
+}
+void XianRenProp::Reset()
+{
+    li   = 0.0;
+    nian = 0.0;
+    fu   = 0.0;
 }
 XianRenProp& XianRenProp::operator*=(UnitScale::Enum unitScale)
 {
@@ -1052,4 +1368,5 @@ XianRenProp& XianRenProp::operator*=(UnitScale::Enum unitScale)
     fu   = std::round(fu * unitScale);
     return *this;
 }
+
 } // namespace GearCalc

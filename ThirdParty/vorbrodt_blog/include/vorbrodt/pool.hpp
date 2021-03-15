@@ -48,9 +48,12 @@ public:
     template <typename F, typename... Args>
     void enqueue_work(F&& f, Args&&... args)
     {
-        auto work = [p = std::forward<F>(f), t = std::make_tuple(std::forward<Args>(args)...)]() {
+        auto work = [p = std::forward<F>(f), t = std::make_tuple(std::forward<Args>(args)...)]() mutable {
             std::apply(p, t);
         };
+        //auto work = [p = std::forward<F>(f), t = std::forward_as_tuple(args...)]() mutable {
+        //    std::apply(p, t);
+        //};
         auto i = m_index++;
 
         for (unsigned int n = 0; n < m_count * K; ++n)

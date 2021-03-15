@@ -17,6 +17,9 @@ public:
 
         BestGlobalSumLiNian,
 
+        BestChanJing,
+        BestChanNeng,
+
         Test,
 
         NumSolutions,

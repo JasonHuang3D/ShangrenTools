@@ -57,6 +57,8 @@ private:
         case '1':
         case '2':
         case '3':
+        case '4':
+        case '5':
         {
             int index = std::atoi(&input);
             --index;
@@ -79,7 +81,29 @@ private:
 
     void OnRunningState() override
     {
-        std::cout << u8"开始计算..." << std::endl;
+        std::cout << u8"开始计算";
+        switch (m_currentSolution)
+        {
+        case GearCalc::Calculator::Solution::BestXianRenSumProp:
+            std::cout << std::quoted(u8"最佳仙人总属性");
+            break;
+        case GearCalc::Calculator::Solution::BestGlobalSumLiNian:
+            std::cout << std::quoted(u8"最佳宗门总力念");
+            break;
+        case GearCalc::Calculator::Solution::BestChanJing:
+            std::cout << std::quoted(u8"最佳产仙晶");
+            break;
+        case GearCalc::Calculator::Solution::BestChanNeng:
+            std::cout << std::quoted(u8"最佳产仙能");
+            break;
+        case GearCalc::Calculator::Solution::Test:
+            std::cout << std::quoted(u8"测试");
+            break;
+        default:
+            break;
+        }
+        std::cout <<"..."<< std::endl;
+
         m_errorStr.clear();
 
         if (!m_calculator.Init("XianjieData.json", "XianqiData.json", m_errorStr))
@@ -87,8 +111,6 @@ private:
 
         if (!m_calculator.Run(m_errorStr, m_currentSolution))
             return;
-
-
     }
 
     void OnExitState() override { std::cout << u8"关闭..." << std::endl; }

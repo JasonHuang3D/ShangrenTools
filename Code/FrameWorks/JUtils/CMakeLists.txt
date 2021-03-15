@@ -21,6 +21,7 @@ PUBLIC
 target_link_libraries(${jutils_target_name} 
 PRIVATE
     build_settings
+    vorbrodt_blog
 )
 
 # Call the helper function

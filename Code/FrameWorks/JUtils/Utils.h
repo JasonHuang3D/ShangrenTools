@@ -200,47 +200,92 @@ T& GetSingletonInstance()
     return s_instance;
 }
 
-// Call back signature: void(const std::vector<std::size_t>& combIndexVec, std::size_t indexOfComb)
-template <typename TypeCallBack>
-std::size_t SelectCombination(
-    std::size_t numElelment, std::size_t numSelect, TypeCallBack&& callBack)
+// Helper function for unsigned int division, e.g. 5 / 3 = 2;
+template <typename T, typename = typename std::enable_if_t<std::is_unsigned_v<T>>>
+constexpr std::uint32_t CeilUintDivision(T x, T y)
 {
-    if (numElelment < numSelect)
-    {
-        assert(false);
+    if (x == 0)
         return 0;
+    return 1 + ((x - 1) / y);
+}
+
+struct PickIndex
+{
+    // Index bit mask
+    static constexpr std::uint32_t k_maxInputSize = 64;
+    static constexpr auto k_inputIndexBitMask =
+        ArrayHelper::CreateArrayWithInitValues<std::uint64_t, k_maxInputSize>(ArrayHelper::BitMaskGenerator);
+
+    // Config max picked table by removing the bits from left most to match number of inputs
+    template <typename T, typename = typename std::enable_if_t<std::is_unsigned_v<T>>>
+    static constexpr std::uint64_t GetMaxPickedIndices(T inputSize)
+    {
+        assert(k_maxInputSize > inputSize && inputSize > 0);
+
+        auto out = std::numeric_limits<std::uint64_t>::max();
+
+        auto numBitsToRemove = k_maxInputSize - inputSize;
+        out >>= numBitsToRemove;
+        return out;
+    }
+};
+namespace SelectCombination
+{
+// Helper function to get the total size of selection combs
+inline constexpr std::size_t GetNumOfSelectionComb(std::size_t numElelment, std::size_t numSelect)
+{
+    if (numSelect > numElelment)
+        return 0;
+    if (numSelect * 2 > numElelment)
+        numSelect = numElelment - numSelect;
+    if (numSelect == 0)
+        return 1;
+
+    std::size_t result = numElelment;
+    for (std::size_t i = 2; i <= numSelect; ++i)
+    {
+        result *= (numElelment - i + 1);
+        result /= i;
+    }
+    return result;
+}
+
+// Single thread solution
+std::size_t RunSingleThread(std::size_t numElelment, std::size_t numSelect,
+    std::function<void(const std::vector<std::size_t>&, std::size_t)> callBack);
+
+// Multi thread solution
+std::size_t RunMultiThread(std::size_t numElelment, std::size_t numSelect,
+    std::function<void(const std::vector<std::size_t>&, std::size_t)> callBack);
+
+
+struct SelectGroupComb
+{
+    template <typename TypeCallBack>
+    SelectGroupComb(std::uint32_t numInputs, std::uint32_t numGroups, std::uint32_t numPerGroup,
+        TypeCallBack&& callBack) :
+        m_numInputs(numInputs),
+        m_numGroups(numGroups),
+        m_numPerGroup(numPerGroup),
+        m_maxSelectInputMask(PickIndex::GetMaxPickedIndices(numInputs)),
+        m_callBack(std::forward<TypeCallBack>(callBack))
+    {
     }
 
-    std::vector<std::size_t> inputIndices(numElelment);
-    for (std::size_t i = 0; i < numElelment; ++i)
-        inputIndices[i] = i;
+    void Run(bool useMultiThread = true);
+private:
 
-    std::vector<std::size_t> stack(numSelect);
-    std::size_t numCombs = 0;
-    const std::size_t kEnd = numElelment - numSelect;
-    auto combRecursion =
-        LambdaCombinator([&](auto& selfLambda, std::size_t offset, std::size_t stackIndex) -> void {
-            if (stackIndex == numSelect)
-            {
-                if constexpr (!std::is_same_v<TypeCallBack, std::nullptr_t>)
-                {
-                    std::forward<TypeCallBack>(callBack)(stack, numCombs);
-                }
-                ++numCombs;
-                return;
-            }
 
-            auto endIndex = kEnd + stackIndex;
-            for (std::size_t i = offset; i <= endIndex; ++i)
-            {
-                stack[stackIndex] = inputIndices[i];
-                selfLambda(i + 1, stackIndex + 1);
-            }
-        });
+    const std::uint32_t m_numInputs;
+    const std::uint32_t m_numGroups;
+    const std::uint32_t m_numPerGroup;
+    const std::uint64_t m_maxSelectInputMask;
 
-    combRecursion(0, 0);
-    return numCombs;
-}
-std::size_t GetNumOfSelectionComb(std::size_t numElelment, std::size_t numSelect);
+    std::function<void(const std::vector<std::uint64_t>&)> m_callBack;
+};
+} // namespace SelectCombination
+
+
+
 
 } // namespace JUtils

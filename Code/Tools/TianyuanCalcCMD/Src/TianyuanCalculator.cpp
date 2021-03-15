@@ -20,7 +20,6 @@
 
 #define USE_REMOVE_DUPLICATES false
 #define USE_STD_PAR_FOR_OVERALL_SOLUTION false
-
 namespace
 {
 using namespace JUtils;
@@ -734,19 +733,19 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
                             outputPath(targetIndex, prevExeed);
                             return;
                         }
-                        else
-                        {
-                            auto fSum = static_cast<float>(
-                                static_cast<double>(sum) / resultList.m_unitScale);
-
-                            // if we can finish this target, update the refs.
-                            std::lock_guard lock(recordResultMutex);
-                            refMaxNumFinishedTarget = targetIndex;
-
-                            refMinExeedSum = prevExeed + fSum;
-                        }
+                        //else
+                        //{
+                        //    auto fSum = static_cast<float>(
+                        //        static_cast<double>(sum) / resultList.m_unitScale);
+                        //    
+                        //    // if we can finish this target, update the refs.
+                        //    std::lock_guard lock(recordResultMutex);
+                        //    refMaxNumFinishedTarget = targetIndex;
+                        //    
+                        //    refMinExeedSum = prevExeed + fSum;
+                        //}
                     }
-                    else
+                    else 
                     {
                         // At this point, we still have unpicked indices and still have targets to
                         // finish. But num finished target can not be greater.
