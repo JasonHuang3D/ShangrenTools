@@ -6,13 +6,13 @@ chcp 65001
 pushd %~dp0
 
 :: Configs
-set target_name=TianyuanCalcCMD
+set target_name=GearCalcCMD
 set build_folder=build
 set build_mode=Release
 set dest_folder=%~dp0bin\
-set dest_name=通用副本工具beta1.7.1.zip
+set dest_name=仙界模拟器beta1.0.zip
 set intro_file="更新及说明.txt"
-set additional_files=(inputData.txt targetData.txt)
+set additional_files=(XianjieData.json XianqiData.json)
 
 set root_folder=%~dp0..\..\
 set root_build_folder=%root_folder%%build_folder%\
