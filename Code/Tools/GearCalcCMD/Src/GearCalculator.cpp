@@ -47,7 +47,7 @@ void GetSumOfXianjieChanyeBuffs(const XianJieFileData& xianJieFileData, ChanyePr
         out.IncreaseBy<PropMask>(data.tianfu_chanye_buff);
 }
 template <XianRenPropertyMask PropMask = XianRenPropertyMask::All>
-void GetXianRenSelfBuff(const XianRenData& target, XianRenPropBuff& out)
+void AddXianRenSelfBuff(const XianRenData& target, XianRenPropBuff& out)
 {
     if (target.pXianzhi != nullptr)
     {
@@ -81,7 +81,7 @@ std::vector<XianRenPropBuff> GetXianRenStaicBuffVec(const XianJieFileData& xianJ
 
         auto& xianRenSelfBuff = out[i];
 
-        GetXianRenSelfBuff<PropMask>(xianRenConstRef, xianRenSelfBuff);
+        AddXianRenSelfBuff<PropMask>(xianRenConstRef, xianRenSelfBuff);
 
         // Add global buffs to each one
         xianRenSelfBuff.IncreaseBy<PropMask>(xianJie_individual_buff);
@@ -135,7 +135,6 @@ void GetChanyeProp(const XianRenProp& xianRenPropSum, const ChanyeFieldData& cha
     // Apply chanye buffs
     out.ApplyBuff(allChanyeBuffs);
 }
-
 } // namespace GameAlgorithms
 
 void PrintLargeSpace()
@@ -185,7 +184,8 @@ public:
 
     bool Run(std::string& errorStr) override
     {
-        const auto& xianRenVec    = m_xianJieFileData.GetCalcXianRenDataVec();
+        const auto& xianRenVec = m_xianJieFileData.GetCalcXianRenDataVec();
+
         const auto& xianQiVec     = m_xianQiFileData.GetCalcGearsVec();
         const auto xianRenVecSize = xianRenVec.size();
         const auto xianQiVecSize  = xianQiVec.size();
@@ -234,6 +234,9 @@ public:
         XianRenProp best_xianren_prop_sum;
         double best_xianren_individual_sum_num = 0.0;
         double best_global_li_nian_sum_num     = 0.0;
+        std::vector<XianRenProp> bestXianRenFinalPropVec;
+
+        std::vector<XianRenProp> xianRenFinalPropStack(xianRenVecSize);
         auto combCallBack = [&](const CombVecType& combIndexVec, std::size_t indexOfComb) -> void {
             if constexpr (SolutionType == Calculator::Solution::BestXianRenSumProp)
             {
@@ -257,7 +260,8 @@ public:
                         xianQi_individual_buff.Add<kXianRenPropMask>(xianRenStaticBuffVec[i]);
 
                     // Apply all buffs to xian ren.
-                    auto xianRenPropCopy = pXianRenData->baseProp;
+                    auto& xianRenPropCopy = xianRenFinalPropStack[i];
+                    xianRenPropCopy       = pXianRenData->baseProp;
                     xianRenPropCopy.ApplyBuff<kXianRenPropMask>(allBuffs);
 
                     // Accomulate the sum.
@@ -272,6 +276,8 @@ public:
                         bestComb                        = combIndexVec;
                         best_xianren_prop_sum           = sumXianRenProp;
                         best_xianren_individual_sum_num = sum;
+
+                        bestXianRenFinalPropVec = xianRenFinalPropStack;
                     }
                 }
             }
@@ -300,7 +306,8 @@ public:
                         xianQi_individual_buff.Add<kXianRenPropMask>(xianRenStaticBuffVec[i]);
 
                     // Apply all buffs to xian ren.
-                    auto xianRenPropCopy = pXianRenData->baseProp;
+                    auto& xianRenPropCopy = xianRenFinalPropStack[i];
+                    xianRenPropCopy       = pXianRenData->baseProp;
                     xianRenPropCopy.ApplyBuff<kXianRenPropMask>(allBuffs);
 
                     // Accomulate the sum.
@@ -318,6 +325,8 @@ public:
                         bestComb                    = combIndexVec;
                         best_xianren_prop_sum       = sumXianRenProp;
                         best_global_li_nian_sum_num = sum;
+
+                        bestXianRenFinalPropVec = xianRenFinalPropStack;
                     }
                 }
             }
@@ -344,13 +353,22 @@ public:
             return false;
         }
 
+        for (int i = 0; i < xianRenVecSize; ++i)
+        {
+            if (i != 0)
+                PrintSmallSpace();
+            std::cout << u8"仙人" << i + 1 << ": " << std::quoted(xianRenVec[i]->name) << std::endl;
+            std::cout << bestXianRenFinalPropVec[i].ToString();
+        }
+
+        PrintLargeSpace();
+
         std::vector<const GearData*> selectedGears;
         selectedGears.reserve(maxEquiptNum);
         for (auto& combIndex : bestComb)
         {
             selectedGears.emplace_back(xianQiVec[combIndex]);
         }
-
         std::cout << u8"挑选仙器: " << std::endl;
         PrintSmallSpace();
         XianRenPropBuff xianQi_individual_buff_sum;
@@ -458,13 +476,13 @@ struct ChanYeSelector : public SolutionSelectorBase
         {
             SelectedChanyeXianRen(
                 std::uint32_t xianRenIndexInXinrenVec, std::uint32_t chanyeIndexInChanyeVec) :
-                xianRenIndexInXinrenVec(xianRenIndexInXinrenVec),
+                xianRenIndexInXianRenVec(xianRenIndexInXinrenVec),
                 chanyeIndexInChanyeVec(chanyeIndexInChanyeVec)
             {
             }
 
-            std::uint32_t xianRenIndexInXinrenVec = GetInvalidValue(32);
-            std::uint32_t chanyeIndexInChanyeVec  = GetInvalidValue(32);
+            std::uint32_t xianRenIndexInXianRenVec = GetInvalidValue(32);
+            std::uint32_t chanyeIndexInChanyeVec   = GetInvalidValue(32);
         };
         std::vector<SelectedChanyeXianRen> selectedXianRenVec;
         {
@@ -548,11 +566,13 @@ struct ChanYeSelector : public SolutionSelectorBase
             {
                 const auto& selectedXianRen = selectedXianRenVec[i];
                 std::cout << u8"仙人" << i + 1 << ": "
-                          << xianRenVec[selectedXianRen.xianRenIndexInXinrenVec]->name
+                          << std::quoted(xianRenVec[selectedXianRen.xianRenIndexInXianRenVec]->name)
                           << u8", 所属产业: "
-                          << chanyeVec[selectedXianRen.chanyeIndexInChanyeVec].name << std::endl;
+                          << std::quoted(chanyeVec[selectedXianRen.chanyeIndexInChanyeVec].name)
+                          << std::endl;
             }
             PrintLargeSpace();
+            std::cout << u8"继续计算中, 请耐心等待..." << std::endl;
 
             // Sort selected xian ren vec by index in chanye vec
             std::sort(std::execution::par_unseq, selectedXianRenVec.begin(),
@@ -566,6 +586,8 @@ struct ChanYeSelector : public SolutionSelectorBase
         // Select Xianqi
         std::vector<const GearData*> selectedGears;
         ChanyePropType bestChanyeProp;
+        std::vector<XianRenProp> bestXianRenFinalPropVec;
+        std::vector<ChanyePropType> bestChanyeFinalOutputVec;
         {
 
             if (selectedXianRenVec.empty())
@@ -578,6 +600,8 @@ struct ChanYeSelector : public SolutionSelectorBase
             // Best ones
             using CombVecType = std::vector<std::size_t>;
             CombVecType bestComb;
+            std::vector<XianRenProp> xianRenFinalPropStack(xianRenVecSize);
+            std::vector<ChanyePropType> chanyeFinalOutputStack(chanyeVecSize);
             auto combCallBack = [&](const CombVecType& combIndexVec,
                                     std::size_t indexOfComb) -> void {
                 // Accomulate all individual buff and all chanye buff of each Xian Qi
@@ -602,7 +626,8 @@ struct ChanYeSelector : public SolutionSelectorBase
                     auto allChanyeBuffs =
                         chanyeFieldStaticBuffVec[currentChanyeIndex].Add<kChanyePropMask>(
                             xianQi_chanye_buff);
-                    ChanyePropType chanyeProp;
+
+                    auto& chanyeProp = chanyeFinalOutputStack[currentChanyeIndex];
                     GameAlgorithms::GetChanyeProp(
                         sumXianRenProp, chanyeVec[currentChanyeIndex], allChanyeBuffs, chanyeProp);
 
@@ -628,11 +653,14 @@ struct ChanYeSelector : public SolutionSelectorBase
                     // All XianRen buffs is now xianQi_individual_buffs + xianRenStaticBuff (xianzhi
                     // + fushi + global)
                     auto allXianRenBuffs = xianQi_individual_buffs.Add<kXianRenPropMask>(
-                        xianRenStaticBuffVec[selectedXianRen.xianRenIndexInXinrenVec]);
+                        xianRenStaticBuffVec[selectedXianRen.xianRenIndexInXianRenVec]);
 
                     // Apply all buffs to xian ren.
-                    auto xianRenPropCopy =
-                        xianRenVec[selectedXianRen.xianRenIndexInXinrenVec]->baseProp;
+                    auto& xianRenPropCopy =
+                        xianRenFinalPropStack[selectedXianRen.xianRenIndexInXianRenVec];
+
+                    xianRenPropCopy =
+                        xianRenVec[selectedXianRen.xianRenIndexInXianRenVec]->baseProp;
                     xianRenPropCopy.ApplyBuff<kXianRenPropMask>(allXianRenBuffs);
 
                     // Accomulate the sum of each Xian Prop of current chanye field.
@@ -648,6 +676,9 @@ struct ChanYeSelector : public SolutionSelectorBase
                     {
                         bestComb       = combIndexVec;
                         bestChanyeProp = sumChanyeProp;
+
+                        bestXianRenFinalPropVec  = xianRenFinalPropStack;
+                        bestChanyeFinalOutputVec = chanyeFinalOutputStack;
                     }
                 }
             };
@@ -698,13 +729,18 @@ struct ChanYeSelector : public SolutionSelectorBase
 
         PrintLargeSpace();
 
-        std::cout << u8"挑选仙人: " << std::endl;
-        PrintSmallSpace();
         {
             std::uint32_t currentChanyeIndex  = selectedXianRenVec[0].chanyeIndexInChanyeVec;
             std::uint32_t currentXianRenIndex = 0;
-            std::cout << u8"产业: " << chanyeVec[currentChanyeIndex].name << std::endl;
-            for (std::uint32_t i = 0; i < selectedXianRenVec.size(); ++i)
+
+            auto printChanye = [&]() -> void {
+                std::cout << u8"产业: " << std::quoted(chanyeVec[currentChanyeIndex].name)
+                          << u8" 总产值: " << bestChanyeFinalOutputVec[currentChanyeIndex].output
+                          << std::endl;
+            };
+
+            printChanye();
+            for (std::uint32_t i = 0; i < selectedXianRenSize; ++i)
             {
                 const SelectedChanyeXianRen& selectedXianRen = selectedXianRenVec[i];
 
@@ -713,15 +749,21 @@ struct ChanYeSelector : public SolutionSelectorBase
                 {
                     currentChanyeIndex  = selectedChanyeIndex;
                     currentXianRenIndex = 0;
-                    PrintSmallSpace();
 
-                    std::cout << u8"产业: " << chanyeVec[currentChanyeIndex].name << std::endl;
+                    PrintLargeSpace();
+                    printChanye();
                 }
+
+                PrintSmallSpace();
                 std::cout << u8"仙人" << currentXianRenIndex + 1 << ": "
-                          << xianRenVec[selectedXianRen.xianRenIndexInXinrenVec]->name << std::endl;
+                          << std::quoted(xianRenVec[selectedXianRen.xianRenIndexInXianRenVec]->name)
+                          << std::endl;
+                std::cout
+                    << bestXianRenFinalPropVec[selectedXianRen.xianRenIndexInXianRenVec].ToString();
+
                 ++currentXianRenIndex;
             }
-            PrintSmallSpace();
+            PrintLargeSpace();
         }
         std::cout << "每轮收益:" << std::endl << bestChanyeProp.ToString();
         PrintLargeSpace();

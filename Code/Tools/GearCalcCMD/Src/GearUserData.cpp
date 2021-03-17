@@ -934,25 +934,22 @@ struct ChanyeFieldArrayDescBase : public JsonUtils::JsonArrayDescBase
             s_outMap.try_emplace(k_key_chanye_weight_li,
 
                 JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Assign,
-                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number,
-                ChanyeFieldData, double>(
-                    &ChanyeFieldData::li_weight, k_key_chanye_weight_li),
+                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number, ChanyeFieldData,
+                    double>(&ChanyeFieldData::li_weight, k_key_chanye_weight_li),
                 true // true means this key is required in Json file.
             );
             s_outMap.try_emplace(k_key_chanye_weight_nian,
 
                 JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Assign,
-                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number,
-                ChanyeFieldData, double>(
-                    &ChanyeFieldData::nian_weight, k_key_chanye_weight_nian),
+                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number, ChanyeFieldData,
+                    double>(&ChanyeFieldData::nian_weight, k_key_chanye_weight_nian),
                 true // true means this key is required in Json file.
             );
             s_outMap.try_emplace(k_key_chanye_weight_fu,
 
                 JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Assign,
-                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number,
-                ChanyeFieldData, double>(
-                    &ChanyeFieldData::fu_weight, k_key_chanye_weight_fu),
+                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number, ChanyeFieldData,
+                    double>(&ChanyeFieldData::fu_weight, k_key_chanye_weight_fu),
                 true // true means this key is required in Json file.
             );
         }
@@ -1158,7 +1155,6 @@ bool XianJieFileData::ReadFromJsonFile(
                         assert(false);
                         return false;
                     }
-                  
                 }
                 return true;
             };
@@ -1195,6 +1191,12 @@ bool XianJieFileData::ReadFromJsonFile(
             out.m_calcXianRenDataVec, fileName, errorStr);
         if (!succeed)
             return false;
+
+        // Sort by descending order order
+        std::sort(std::execution::par_unseq, out.m_calcXianRenDataVec.begin(),
+            out.m_calcXianRenDataVec.end(), [](const XianRenData* a, const XianRenData* b) -> bool {
+                return a->baseProp.GetSum() > b->baseProp.GetSum();
+            });
     }
 
     return true;

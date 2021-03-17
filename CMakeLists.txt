@@ -22,7 +22,7 @@ if (MSVC)
     # - disable w4189 - local variable is initialized but not referenced
     # - Enable whole program optimization (/GL)
     # - Enable string pooling (/GF)
-    set(MSVC_ALL_RELEASE_COMPILE_OPTIONS /wd4189 /GL /GF)
+    set(MSVC_ALL_RELEASE_COMPILE_OPTIONS /wd4189 /GL /GF /utf-8)
     # In RELEASE mode:
     # - Set favor fast code option (/Ot)
     # - Enable intrinsic functions (/Oi)

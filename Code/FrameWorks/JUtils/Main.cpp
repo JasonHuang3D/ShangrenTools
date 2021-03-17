@@ -25,25 +25,16 @@ bool ConfigPlatformCMD()
     // To force the windows console to use UTF-8 code page.
     ::SetConsoleOutputCP(CP_UTF8);
 
-    // Fix windows 7 utf-8 issue
-    struct MBuf : public std::stringbuf
-    {
-        int sync()
-        {
-            ::fputs(this->str().c_str(), stdout);
-            this->str("");
-            return 0;
-        }
-    };
-    ::setvbuf(stdout, nullptr, _IONBF, 0);
-    static MBuf buf;
-    std::cout.rdbuf(&buf);
-
-    //std::cout << u8"Greek: αβγδ; German: Übergrößenträger" << std::endl;
+    // Set console font to Lucida Console to fix issue on windows 7
+    HANDLE hOut = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_FONT_INFOEX font = { sizeof(font) };
+    ::GetCurrentConsoleFontEx(hOut, FALSE, &font);
+    ::wcscpy_s(font.FaceName, L"Lucida Console");
+    ::SetCurrentConsoleFontEx(hOut, FALSE, &font);
 
     // Disable quick edit mode of console on Windows 10
-    HANDLE hInput;
     DWORD prev_mode;
+    HANDLE hInput;
     hInput = ::GetStdHandle(STD_INPUT_HANDLE);
     ::GetConsoleMode(hInput, &prev_mode);
     ::SetConsoleMode(hInput, ENABLE_EXTENDED_FLAGS | (prev_mode & ~ENABLE_QUICK_EDIT_MODE));
