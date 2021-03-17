@@ -130,9 +130,8 @@ template <ChanyeFieldCategory::Enum ChanyeCat,
 void GetChanyeProp(const XianRenProp& xianRenPropSum, const ChanyeFieldData& chanyeData,
     const ChanyePropBuff& allChanyeBuffs, ChanyeProp<ChanyeCat>& out)
 {
-    const auto& chanyeInfo = chanyeData.chanyeInfo;
     // Base output
-    out.output = chanyeInfo.opFunction(xianRenPropSum);
+    out.output = chanyeData.CalcBaseOutput(xianRenPropSum);
     // Apply chanye buffs
     out.ApplyBuff(allChanyeBuffs);
 }
@@ -254,7 +253,8 @@ public:
                     const auto* pXianRenData = xianRenVec[i];
 
                     // All buffs.
-                    auto allBuffs = xianQi_individual_buff.Add<kXianRenPropMask>(xianRenStaticBuffVec[i]);
+                    auto allBuffs =
+                        xianQi_individual_buff.Add<kXianRenPropMask>(xianRenStaticBuffVec[i]);
 
                     // Apply all buffs to xian ren.
                     auto xianRenPropCopy = pXianRenData->baseProp;
@@ -296,7 +296,8 @@ public:
                     const auto* pXianRenData = xianRenVec[i];
 
                     // All buffs.
-                    auto allBuffs = xianQi_individual_buff.Add<kXianRenPropMask>(xianRenStaticBuffVec[i]);
+                    auto allBuffs =
+                        xianQi_individual_buff.Add<kXianRenPropMask>(xianRenStaticBuffVec[i]);
 
                     // Apply all buffs to xian ren.
                     auto xianRenPropCopy = pXianRenData->baseProp;
@@ -333,6 +334,8 @@ public:
 
         std::cout << u8"仙器挑选耗时: " << timer.DurationInSec() << u8"秒" << std::endl;
         std::cout << u8"共计算组合数: " << numCombs << std::endl;
+        PrintLargeSpace();
+
         if (numCombs != expectedCombSize)
         {
             errorStr +=
@@ -349,6 +352,7 @@ public:
         }
 
         std::cout << u8"挑选仙器: " << std::endl;
+        PrintSmallSpace();
         XianRenPropBuff xianQi_individual_buff_sum;
         XianRenPropBuff xianQi_global_buff_sum;
         for (const auto* pGear : selectedGears)
@@ -360,10 +364,17 @@ public:
 
         PrintLargeSpace();
 
-        std::cout << u8"仙器属性总和: \n"
-                  << xianQi_individual_buff_sum.ToString(XianRenPropBuff::k_individual_prefix)
-                  << xianQi_global_buff_sum.ToString(XianRenPropBuff::k_global_prefix) << std::endl;
-        std::cout << u8"仙人属性总和: \n" << best_xianren_prop_sum.ToString() << std::endl;
+        std::cout << u8"仙器属性总和:" << std::endl;
+        PrintSmallSpace();
+        std::cout << xianQi_individual_buff_sum.ToString(XianRenPropBuff::k_individual_prefix);
+        PrintSmallSpace();
+        std::cout << xianQi_global_buff_sum.ToString(XianRenPropBuff::k_global_prefix);
+
+        PrintLargeSpace();
+
+        std::cout << u8"仙人属性总和:" << std::endl;
+        PrintSmallSpace();
+        std::cout << best_xianren_prop_sum.ToString() << std::endl;
 
         PrintLargeSpace();
 
@@ -401,8 +412,7 @@ struct ChanYeSelector : public SolutionSelectorBase
         // Chanye related refs and consts.
         const std::vector<ChanyeFieldData>& chanyeVec =
             m_xianJieFileData.GetChanYeFieldDataVec<kChanyeCat>();
-        const auto chanyeVecSize            = chanyeVec.size();
-        constexpr auto kNumXianRenPerChanye = 3u;
+        const auto chanyeVecSize = chanyeVec.size();
 
         // XianRen related refs and consts.
         const auto& xianRenVec    = m_xianJieFileData.GetCalcXianRenDataVec();
@@ -456,9 +466,7 @@ struct ChanYeSelector : public SolutionSelectorBase
             std::uint32_t xianRenIndexInXinrenVec = GetInvalidValue(32);
             std::uint32_t chanyeIndexInChanyeVec  = GetInvalidValue(32);
         };
-
         std::vector<SelectedChanyeXianRen> selectedXianRenVec;
-        selectedXianRenVec.reserve(chanyeVecSize * kNumXianRenPerChanye);
         {
 
             struct ChanyeWeight
@@ -521,9 +529,10 @@ struct ChanYeSelector : public SolutionSelectorBase
                 if (pickedIndices & indexBitMask)
                     continue;
 
-                auto& chanyeNumCount = chanyeXianRenCountVec[weight.chanyeFieldIndex];
+                const auto& chanyeFieldData = chanyeVec[weight.chanyeFieldIndex];
+                auto& chanyeNumCount        = chanyeXianRenCountVec[weight.chanyeFieldIndex];
                 // Still have room for more Xianren
-                if (chanyeNumCount < kNumXianRenPerChanye)
+                if (chanyeNumCount < chanyeFieldData.numXianRen)
                 {
                     selectedXianRenVec.emplace_back(weight.xianRenIndex, weight.chanyeFieldIndex);
 
@@ -533,6 +542,8 @@ struct ChanYeSelector : public SolutionSelectorBase
             }
 
             std::cout << u8"不考虑装备的影响下, 选择以下仙人, 按产出由大到小排列:" << std::endl;
+            PrintSmallSpace();
+
             for (std::uint32_t i = 0; i < selectedXianRenVec.size(); ++i)
             {
                 const auto& selectedXianRen = selectedXianRenVec[i];
@@ -543,12 +554,11 @@ struct ChanYeSelector : public SolutionSelectorBase
             }
             PrintLargeSpace();
 
-            // Sort selected xian ren vec by index of chanyeInfo
+            // Sort selected xian ren vec by index in chanye vec
             std::sort(std::execution::par_unseq, selectedXianRenVec.begin(),
                 selectedXianRenVec.end(),
                 [&](const SelectedChanyeXianRen& a, const SelectedChanyeXianRen& b) -> bool {
-                    return chanyeVec[a.chanyeIndexInChanyeVec].chanyeInfo.index <
-                        chanyeVec[b.chanyeIndexInChanyeVec].chanyeInfo.index;
+                    return a.chanyeIndexInChanyeVec < b.chanyeIndexInChanyeVec;
                 });
         }
 
@@ -615,10 +625,10 @@ struct ChanYeSelector : public SolutionSelectorBase
                         sumXianRenProp.Reset();
                     }
 
-                    // All XianRen buffs is now xianQi_individual_buffs + xianRenStaticBuff (xianzhi +
-                    // fushi + global)
-                    auto allXianRenBuffs =
-                        xianQi_individual_buffs.Add<kXianRenPropMask>(xianRenStaticBuffVec[selectedXianRen.xianRenIndexInXinrenVec]);
+                    // All XianRen buffs is now xianQi_individual_buffs + xianRenStaticBuff (xianzhi
+                    // + fushi + global)
+                    auto allXianRenBuffs = xianQi_individual_buffs.Add<kXianRenPropMask>(
+                        xianRenStaticBuffVec[selectedXianRen.xianRenIndexInXinrenVec]);
 
                     // Apply all buffs to xian ren.
                     auto xianRenPropCopy =
@@ -667,6 +677,7 @@ struct ChanYeSelector : public SolutionSelectorBase
         }
 
         std::cout << u8"挑选仙器: " << std::endl;
+        PrintSmallSpace();
         XianRenPropBuff xianQi_individual_buff_sum;
         ChanyePropBuff xianQi_chanye_buff_sum;
         for (const auto* pGear : selectedGears)
@@ -679,13 +690,16 @@ struct ChanYeSelector : public SolutionSelectorBase
 
         PrintSmallSpace();
 
-        std::cout << u8"仙器属性总和: \n"
-                  << xianQi_individual_buff_sum.ToString(XianRenPropBuff::k_individual_prefix)
-                  << xianQi_chanye_buff_sum.ToString() << std::endl;
+        std::cout << u8"仙器属性总和:" << std::endl;
+        PrintSmallSpace();
+        std::cout << xianQi_individual_buff_sum.ToString(XianRenPropBuff::k_individual_prefix);
+        PrintSmallSpace();
+        std::cout << xianQi_chanye_buff_sum.ToString() << std::endl;
 
         PrintLargeSpace();
 
         std::cout << u8"挑选仙人: " << std::endl;
+        PrintSmallSpace();
         {
             std::uint32_t currentChanyeIndex  = selectedXianRenVec[0].chanyeIndexInChanyeVec;
             std::uint32_t currentXianRenIndex = 0;
@@ -920,83 +934,10 @@ bool Calculator::Run(std::string& errorStr, Solution solution)
     {
 #ifdef M_DEBUG
 
-        UnitTest::TestSelectionComb();
-        // assert(false);
-
         if (0)
         {
+            UnitTest::TestSelectionComb();
             UnitTest::TestSelectComb();
-
-            const auto& calcXianRenVec = m_xianJieFileData.GetCalcXianRenDataVec();
-            const auto xianRenVecSize  = calcXianRenVec.size();
-
-            constexpr const char* selectGears[] = { u8"造化圣塔-福念", u8"造化圣塔-福力",
-                u8"造化玄天塔-01", u8"造化玄天塔-02", u8"造化玄天塔-03", u8"造化玄天塔-04",
-                u8"造化玄天塔-05" };
-            constexpr auto gearSize             = std::size(selectGears);
-
-            std::vector<const GearData*> gearsVec;
-            gearsVec.reserve(gearSize);
-
-            const auto& gearsLoopUp = m_xianQiFileData.GetLoopUpGears();
-            for (const auto* gearName : selectGears)
-            {
-                auto it = gearsLoopUp.find(gearName);
-                if (it == gearsLoopUp.end())
-                {
-                    assert(false);
-                    return false;
-                }
-                gearsVec.emplace_back(it->second);
-            }
-
-            std::cout << "Xian ren size: " << xianRenVecSize << std::endl;
-
-            // Init global buffs
-            XianRenPropBuff xianJie_individual_buff;
-            GameAlgorithms::GetSumOfXianjieIndividualBuffs(
-                m_xianJieFileData, xianJie_individual_buff);
-            XianRenPropBuff xianJie_global_Buff;
-            GameAlgorithms::GetSumOfXianjieGlobalBuffs(m_xianJieFileData, xianJie_global_Buff);
-
-            // Init xian ren self buff vec
-            std::vector<XianRenPropBuff> xianRenSelfBuffVec;
-            xianRenSelfBuffVec.reserve(xianRenVecSize);
-            for (const auto* pXianRenData : calcXianRenVec)
-            {
-                // xianRenSelfBuffVec.emplace_back(GameAlgorithms::GetXianRenSelfBuff(*pXianRenData));
-            }
-
-            constexpr auto propMask = XianRenPropertyMask::All;
-            // Init All gears buff
-            XianRenPropBuff gear_individual_buff;
-            XianRenPropBuff gear_global_buff;
-            for (const auto& data : gearsVec)
-            {
-                gear_individual_buff.IncreaseBy<propMask>(data->individualBuff);
-                gear_global_buff.IncreaseBy<propMask>(data->globalBuff);
-            }
-            // Accomulating xian ren
-            XianRenProp sumXianRenProp;
-            for (int i = 0; i < xianRenVecSize; ++i)
-            {
-                auto all_xianren_buff = xianJie_individual_buff.Add<propMask>(gear_individual_buff);
-                all_xianren_buff.IncreaseBy<propMask>(xianRenSelfBuffVec[i]);
-
-                auto xianRen = *calcXianRenVec[i];
-                xianRen.baseProp.ApplyBuff<propMask>(all_xianren_buff);
-
-                std::cout << xianRen.name << ":\n" << xianRen.baseProp.ToString() << std::endl;
-
-                sumXianRenProp.IncreaseBy<propMask>(xianRen.baseProp);
-            }
-
-            std::cout << "Xian ren Sum:\n" << sumXianRenProp.ToString() << std::endl;
-
-            auto all_global_buffs = xianJie_global_Buff.Add<propMask>(gear_global_buff);
-            sumXianRenProp.ApplyBuff<propMask>(all_global_buffs);
-
-            std::cout << "Zong men Sum:\n" << sumXianRenProp.ToString() << std::endl;
         }
 #else
         errorStr += u8"测试模式仅供开发阶段使用\n";

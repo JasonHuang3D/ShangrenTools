@@ -10,8 +10,8 @@ set target_name=TianyuanCalcCMD
 set build_folder=build
 set build_mode=Release
 set dest_folder=%~dp0bin\
-set dest_name=通用副本工具beta1.7.1.zip
-set intro_file="更新及说明.txt"
+set dest_name=通用副本工具beta1.7.2.zip
+set intro_file="README.txt"
 set additional_files=(inputData.txt targetData.txt)
 
 set root_folder=%~dp0..\..\

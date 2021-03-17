@@ -383,28 +383,25 @@ struct XianRenData
     const XianZhiData* pXianzhi = nullptr;
 };
 
-// Chanye Map
-struct ChanyeFieldInfo
-{
-    ChanyeFieldInfo() {};
-
-    template <typename TypeFunction>
-    ChanyeFieldInfo(std::uint32_t index, TypeFunction&& opFunction) :
-        index(index), opFunction(std::forward<TypeFunction>(opFunction))
-    {
-    }
-    std::uint32_t index = JUtils::GetInvalidValue(32);
-    std::function<double(const XianRenProp&)> opFunction;
-};
-
 struct ChanyeFieldData
 {
     std::string name;
 
     // Chanye level buff + Zaohua buff
     double selfBuff = 0.0;
+    std::uint32_t numXianRen = 0;
 
-    ChanyeFieldInfo chanyeInfo;
+
+    double li_weight = 0.0;
+    double nian_weight = 0.0;
+    double fu_weight = 0.0;
+
+    double CalcBaseOutput(const XianRenProp& xianRenProp) const
+    {
+        return std::trunc(xianRenProp.li * li_weight) +
+            std::trunc(xianRenProp.nian * nian_weight) +
+            std::trunc(xianRenProp.fu * fu_weight);
+    }
 };
 
 class XianQiFileData

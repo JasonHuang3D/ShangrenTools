@@ -322,7 +322,7 @@ struct ProcessSelector
         JsonProcessOpType::Enum processOpType, FunctionType&& callBack, bool isRequired = true) :
         targetProcessType(targetProcessType),
         processOpType(processOpType),
-        callBack(std::move(callBack)),
+        callBack(std::forward<FunctionType>(callBack)),
         isRequired(isRequired)
     {
     }
@@ -899,23 +899,60 @@ struct ChanyeFieldArrayDescBase : public JsonUtils::JsonArrayDescBase
         static JsonUtils::PropGroupsToProcessSelectorMapType s_outMap;
         static constexpr auto k_key_chanye_level_buff  = u8"产业等级百分比";
         static constexpr auto k_key_chanye_zaohua_buff = u8"造化百分比";
+
+        static constexpr auto k_key_chanye_numXianren  = u8"人数";
+        static constexpr auto k_key_chanye_weight_li   = u8"力权重";
+        static constexpr auto k_key_chanye_weight_nian = u8"念权重";
+        static constexpr auto k_key_chanye_weight_fu   = u8"福权重";
+
         if (s_outMap.empty())
         {
             // ChanyeFieldData::selfBuff = k_key_chanye_level_buff + k_key_chanye_zaohua_buff
-
             s_outMap.try_emplace(k_key_chanye_level_buff,
 
-                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Assign,
+                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Increase,
                 JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number, ChanyeFieldData,
                     double>(&ChanyeFieldData::selfBuff, k_key_chanye_level_buff),
                 true // true means this key is required in Json file.
             );
-
             s_outMap.try_emplace(k_key_chanye_zaohua_buff,
 
                 JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Increase,
                 JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number, ChanyeFieldData,
                     double>(&ChanyeFieldData::selfBuff, k_key_chanye_zaohua_buff),
+                true // true means this key is required in Json file.
+            );
+            s_outMap.try_emplace(k_key_chanye_numXianren,
+
+                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Assign,
+                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number_unsigned,
+                    ChanyeFieldData, std::uint32_t>(
+                    &ChanyeFieldData::numXianRen, k_key_chanye_numXianren),
+                true // true means this key is required in Json file.
+            );
+
+            s_outMap.try_emplace(k_key_chanye_weight_li,
+
+                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Assign,
+                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number,
+                ChanyeFieldData, double>(
+                    &ChanyeFieldData::li_weight, k_key_chanye_weight_li),
+                true // true means this key is required in Json file.
+            );
+            s_outMap.try_emplace(k_key_chanye_weight_nian,
+
+                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Assign,
+                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number,
+                ChanyeFieldData, double>(
+                    &ChanyeFieldData::nian_weight, k_key_chanye_weight_nian),
+                true // true means this key is required in Json file.
+            );
+            s_outMap.try_emplace(k_key_chanye_weight_fu,
+
+                JsonUtils::TargetProcessType::NumTargets, JsonUtils::JsonProcessOpType::Assign,
+                JsonUtils::ProcessSelectorCallBackWrapper<&Json::is_number,
+                ChanyeFieldData, double>(
+                    &ChanyeFieldData::fu_weight, k_key_chanye_weight_fu),
                 true // true means this key is required in Json file.
             );
         }
@@ -940,111 +977,6 @@ constexpr auto k_key_chanye_obj     = u8"产业";
 constexpr auto k_key_chanyeInterval = u8"收益间隔";
 
 } // namespace XianjieJson
-
-using ChanyeFiledOpMapType = std::unordered_map<std::string, ChanyeFieldInfo>;
-using ChanyeFieldTableType = std::array<ChanyeFiledOpMapType, ChanyeFieldCategory::NumCategory>;
-const ChanyeFieldTableType& GetChanyeTable()
-{
-    // clang-format off
-    static ChanyeFieldTableType s_table{ {
-            // ChanJing
-            {
-               {
-                   u8"仙矿开采",
-                   {
-                       2,
-                       [](const XianRenProp& xianRenProp) -> double
-                       {
-                          return std::trunc(xianRenProp.li * 0.3);
-                       }
-                   }
-               },
-
-               {
-                   u8"仙材种植",
-                   {
-                       3,
-                       [](const XianRenProp& xianRenProp) -> double
-                       {
-                           return std::trunc(xianRenProp.li * 0.03)
-                               + std::trunc(xianRenProp.nian * 0.18);
-                       }
-                   }
-               },
-
-               {
-                   u8"仙器炼制",
-                   {
-                       4,
-                       [](const XianRenProp& xianRenProp) -> double
-                       {
-                           return std::trunc(xianRenProp.li * 0.16)
-                               + std::trunc(xianRenProp.nian * 0.05);
-                       }
-                   }
-               },
-
-               {
-                   u8"仙界商行",
-                   {
-                       5,
-                       [](const XianRenProp& xianRenProp) -> double
-                       {
-                           return std::trunc(xianRenProp.li * 0.07)
-                               + std::trunc(xianRenProp.nian * 0.07)
-                               + std::trunc(xianRenProp.fu * 0.07);
-                       }
-                   }
-               },
-
-               {
-                   u8"绝地寻宝",
-                   {
-                       7,
-                       [](const XianRenProp& xianRenProp) -> double
-                       {
-                           return std::trunc(xianRenProp.li * 0.05)
-                               + std::trunc(xianRenProp.nian * 0.05)
-                               + std::trunc(xianRenProp.fu * 0.25);
-                       }
-                   }
-               }
-
-           },
-
-        // ChanNeng
-        {
-            {
-                u8"聚元仙阵",
-                {
-                    1,
-                    [](const XianRenProp& xianRenProp) -> double
-                    {
-                        return std::trunc(xianRenProp.nian * 0.3);
-                    }
-                }
-            },
-
-            {
-                u8"传道仙馆",
-                {
-                    6,
-                    [](const XianRenProp& xianRenProp) -> double
-                    {
-                        return std::trunc(xianRenProp.li * 0.14)
-                            + std::trunc(xianRenProp.nian * 0.02)
-                            + std::trunc(xianRenProp.fu * 0.14);
-                    }
-                }
-            }
-
-        }
-
-
-    } };
-    // clang-format on
-    return s_table;
-}
 
 } // namespace
 
@@ -1214,22 +1146,10 @@ bool XianJieFileData::ReadFromJsonFile(
         {
             auto postProcessChanye = [&](ChanyeFieldCategory::Enum chanyeType,
                                          std::vector<ChanyeFieldData>& chanyeVec) -> bool {
-                const auto& chanyeTable = GetChanyeTable();
-                const auto& chanyeMap   = chanyeTable[chanyeType];
-
                 // Check every chanye is valid
                 std::unordered_set<std::string> uniqueTable;
-                for (auto& chanyeFieldData : chanyeVec)
+                for (const auto& chanyeFieldData : chanyeVec)
                 {
-                    auto it = chanyeMap.find(chanyeFieldData.name);
-                    if (it == chanyeMap.end())
-                    {
-                        errorStr += FormatString(u8"产业: ", std::quoted(chanyeFieldData.name),
-                            u8" 不是有效的产业名称\n");
-                        assert(false);
-                        return false;
-                    }
-
                     auto insertedPair = uniqueTable.emplace(chanyeFieldData.name);
                     if (!insertedPair.second)
                     {
@@ -1238,16 +1158,8 @@ bool XianJieFileData::ReadFromJsonFile(
                         assert(false);
                         return false;
                     }
-
-                    // Assign chanyeInfo
-                    chanyeFieldData.chanyeInfo = it->second;
+                  
                 }
-
-                std::sort(std::execution::par_unseq, chanyeVec.begin(), chanyeVec.end(),
-                    [](const ChanyeFieldData& a, const ChanyeFieldData& b) {
-                        return a.chanyeInfo.index < b.chanyeInfo.index;
-                    });
-
                 return true;
             };
 
