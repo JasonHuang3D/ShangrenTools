@@ -22,22 +22,26 @@ bool ConfigPlatformCMD()
 #endif
 
 #ifdef WIN32
+    // Set console mode
+    {
+        auto hInput = ::GetStdHandle(STD_INPUT_HANDLE);
+        DWORD newMode = ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT |
+            ENABLE_INSERT_MODE | ENABLE_EXTENDED_FLAGS | ENABLE_AUTO_POSITION;
+        ::SetConsoleMode(hInput, newMode);
+    }
+
     // To force the windows console to use UTF-8 code page.
     ::SetConsoleOutputCP(CP_UTF8);
 
     // Set console font to Lucida Console to fix issue on windows 7
-    HANDLE hOut = ::GetStdHandle(STD_OUTPUT_HANDLE);
-    CONSOLE_FONT_INFOEX font = { sizeof(font) };
-    ::GetCurrentConsoleFontEx(hOut, FALSE, &font);
-    ::wcscpy_s(font.FaceName, L"Lucida Console");
-    ::SetCurrentConsoleFontEx(hOut, FALSE, &font);
-
-    // Disable quick edit mode of console on Windows 10
-    DWORD prev_mode;
-    HANDLE hInput;
-    hInput = ::GetStdHandle(STD_INPUT_HANDLE);
-    ::GetConsoleMode(hInput, &prev_mode);
-    ::SetConsoleMode(hInput, ENABLE_EXTENDED_FLAGS | (prev_mode & ~ENABLE_QUICK_EDIT_MODE));
+    {
+        auto hOut                = ::GetStdHandle(STD_OUTPUT_HANDLE);
+        CONSOLE_FONT_INFOEX font = { sizeof(font) };
+        ::GetCurrentConsoleFontEx(hOut, FALSE, &font);
+        ::wcscpy_s(font.FaceName, L"Lucida Console");
+        ::SetCurrentConsoleFontEx(hOut, FALSE, &font);
+    }
+   
 #endif
     return true;
 }
