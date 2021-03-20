@@ -7,6 +7,7 @@
 #include <chrono>
 #include <functional>
 #include <iomanip>
+#include <locale>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -75,19 +76,66 @@ std::vector<T> TockenizeString(const T& str, const T& delimiters)
     return v;
 }
 
-template <typename... TRest>
-static std::string FormatString(TRest&&... args)
+template <std::streamsize Precision = 2, std::uint8_t NumDigitsToGroup = 4, typename TypeValue,
+    typename TypeExpected = TypeValue, typename = std::enable_if_t<std::is_arithmetic_v<TypeValue>>>
+std::string FormatNumber(TypeValue value)
 {
+    class CommaFacet : public std::numpunct<char>
+    {
+    protected:
+        char do_thousands_sep() const override { return ','; }
+        std::string do_grouping() const override
+        {
+            static constexpr auto kGourp = { static_cast<char>(NumDigitsToGroup) };
+            return kGourp;
+        }
+    };
+    // this creates a new locale based on the current application default
+    // (which is either the one given on startup, but can be overriden with
+    // std::locale::global) - then extends it with an extra facet that
+    // controls numeric output.
+    // Note: std::locale will delete facet ptr when desstruct.
+    static std::locale s_commaLocale(std::locale(), new CommaFacet);
+
     std::stringstream ss;
-    ss << std::fixed << std::setprecision(2);
-    (ss << ... << std::forward<TRest>(args));
+    ss.imbue(s_commaLocale);
+
+    if constexpr (std::is_floating_point_v<TypeExpected>)
+    {
+        ss << std::fixed << std::setprecision(Precision);
+    }
+
+    if constexpr (std::is_same_v<TypeExpected, TypeValue>)
+    {
+        ss << value;
+    }
+    else
+    {
+        ss << static_cast<TypeExpected>(value);
+    }
     return ss.str();
+}
+// Helper to format float to int with commas
+template <typename TypeInt, std::uint8_t NumDigitsToGroup = 4, typename TypeFloat,
+    typename = std::enable_if_t<std::is_floating_point_v<TypeFloat>>>
+std::string FormatFloatToInt(TypeFloat value)
+{
+    return FormatNumber<0, NumDigitsToGroup, TypeFloat, TypeInt>(value);
 }
 
 template <typename TypeFloat, typename TypeInt>
 TypeFloat FormatIntToFloat(TypeInt value, TypeInt scale)
 {
     return static_cast<TypeFloat>(value) / scale;
+}
+
+template <std::streamsize Precision = 2, typename... TRest>
+static std::string FormatString(TRest&&... args)
+{
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(Precision);
+    (ss << ... << std::forward<TRest>(args));
+    return ss.str();
 }
 
 // Helper to check if char ptr is empty
@@ -214,7 +262,8 @@ struct PickIndex
     // Index bit mask
     static constexpr std::uint32_t k_maxInputSize = 64;
     static constexpr auto k_inputIndexBitMask =
-        ArrayHelper::CreateArrayWithInitValues<std::uint64_t, k_maxInputSize>(ArrayHelper::BitMaskGenerator);
+        ArrayHelper::CreateArrayWithInitValues<std::uint64_t, k_maxInputSize>(
+            ArrayHelper::BitMaskGenerator);
 
     // Config max picked table by removing the bits from left most to match number of inputs
     template <typename T, typename = typename std::enable_if_t<std::is_unsigned_v<T>>>
@@ -258,7 +307,6 @@ std::size_t RunSingleThread(std::size_t numElelment, std::size_t numSelect,
 std::size_t RunMultiThread(std::size_t numElelment, std::size_t numSelect,
     std::function<void(const std::vector<std::size_t>&, std::size_t)> callBack);
 
-
 struct SelectGroupComb
 {
     template <typename TypeCallBack>
@@ -273,9 +321,8 @@ struct SelectGroupComb
     }
 
     void Run(bool useMultiThread = true);
+
 private:
-
-
     const std::uint32_t m_numInputs;
     const std::uint32_t m_numGroups;
     const std::uint32_t m_numPerGroup;
@@ -284,8 +331,5 @@ private:
     std::function<void(const std::vector<std::uint64_t>&)> m_callBack;
 };
 } // namespace SelectCombination
-
-
-
 
 } // namespace JUtils

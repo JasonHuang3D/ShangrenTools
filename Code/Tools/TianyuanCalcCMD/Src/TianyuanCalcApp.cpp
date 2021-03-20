@@ -153,7 +153,7 @@ private:
                           << u8", 需求: "
                           << FormatIntToFloat<double>(
                                  result.m_pTarget->GetOriginalData(), resultList.m_unitScale)
-                          << u8",计算结果为: " << std::endl;
+                          << unitStr << u8",计算结果为: " << std::endl;
                 PrintSmallSpace();
 
                 auto& combination = result.m_combination;

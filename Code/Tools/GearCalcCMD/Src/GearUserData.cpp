@@ -1233,12 +1233,12 @@ std::string XianRenPropBuff::ToString(const char* prefix) const
 {
     // clang-format off
     return FormatString(
-        prefix, u8"力数值: ", li_add,           "\n",
-        prefix, u8"力百分比: ", li_percent,     "\n",
-        prefix, u8"念数值: ", nian_add,         "\n",
-        prefix, u8"念百分比: ", nian_percent,   "\n",
-        prefix, u8"福数值: ", fu_add,           "\n",
-        prefix, u8"福百分比: ", fu_percent,     "\n"
+        prefix, u8"力数值: ",       FormatNumber(li_add),       "\n",
+        prefix, u8"力百分比: ",     FormatNumber(li_percent),   "\n",
+        prefix, u8"念数值: ",       FormatNumber(nian_add),     "\n",
+        prefix, u8"念百分比: ",     FormatNumber(nian_percent), "\n",
+        prefix, u8"福数值: ",       FormatNumber(fu_add),       "\n",
+        prefix, u8"福百分比: ",     FormatNumber(fu_percent),   "\n"
     );
     // clang-format on
 }
@@ -1255,18 +1255,25 @@ std::string ChanyePropBuff::ToString() const
 {
     // clang-format off
     return FormatString(
-         u8"产晶数值: ", chanJing_add, "\n",
-         u8"产晶百分比: ", chanJing_percent, "\n",
-         u8"产能数值: ", chanNeng_add, "\n",
-         u8"产能百分比: ", chanNeng_percent, "\n"
+         u8"产晶数值: ",   FormatNumber(chanJing_add),      "\n",
+         u8"产晶百分比: ", FormatNumber(chanJing_percent),  "\n",
+         u8"产能数值: ",   FormatNumber(chanNeng_add),      "\n",
+         u8"产能百分比: ", FormatNumber(chanNeng_percent),  "\n"
     );
     // clang-format on
 }
 
 std::string XianRenProp::ToString() const
 {
-    return FormatString(u8"力: ", li, u8"\n念: ", nian, u8"\n福: ", fu, u8"\n总属性: ",
-        GetSum<XianRenPropertyMask::All>(), "\n");
+    // clang-format off
+    return FormatString(
+        u8"力: ",      FormatFloatToInt<std::uint64_t>(li),   "\n",
+        u8"念: ",      FormatFloatToInt<std::uint64_t>(nian), "\n",
+        u8"福: ",      FormatFloatToInt<std::uint64_t>(fu),   "\n",
+        u8"总属性: ",  FormatFloatToInt<std::uint64_t>(GetSum<XianRenPropertyMask::All>()), "\n"
+    );
+
+    // clang-format on
 }
 void XianRenProp::Reset()
 {

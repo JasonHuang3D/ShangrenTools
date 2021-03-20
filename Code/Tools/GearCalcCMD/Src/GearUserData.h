@@ -325,11 +325,11 @@ struct ChanyeProp
     {
         if constexpr (ChanyeCat == ChanyeFieldCategory::ChanJing)
         {
-            return FormatString(u8"产晶: ", output, "\n");
+            return FormatString(u8"产晶: ", FormatFloatToInt<std::uint64_t>(output), "\n");
         }
         else
         {
-            return FormatString(u8"产能: ", output, "\n");
+            return FormatString(u8"产能: ", FormatFloatToInt<std::uint64_t>(output), "\n");
         }
     }
 

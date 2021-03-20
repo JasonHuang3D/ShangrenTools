@@ -210,7 +210,7 @@ public:
         std::cout << u8"需计算仙人数: " << xianRenVecSize << std::endl;
         std::cout << u8"需计算仙器数: " << xianQiVecSize << std::endl;
         std::cout << u8"可装备个数: " << maxEquiptNum << std::endl;
-        std::cout << u8"需计算: " << expectedCombSize << u8" 种可能性" << std::endl;
+        std::cout << u8"需计算: " << FormatNumber(expectedCombSize) << u8" 种可能性" << std::endl;
         PrintLargeSpace();
 
         if (expectedCombSize == 0)
@@ -453,7 +453,7 @@ struct ChanYeSelector : public SolutionSelectorBase
         std::cout << u8"需计算仙人数: " << xianRenVecSize << std::endl;
         std::cout << u8"需计算仙器数: " << xianQiVecSize << std::endl;
         std::cout << u8"可装备个数: " << maxEquiptNum << std::endl;
-        std::cout << u8"需计算: " << expectedCombSize << u8" 种可能性" << std::endl;
+        std::cout << u8"需计算: " << FormatNumber(expectedCombSize) << u8" 种可能性" << std::endl;
         PrintLargeSpace();
 
         if (expectedCombSize == 0)
@@ -735,7 +735,9 @@ struct ChanYeSelector : public SolutionSelectorBase
 
             auto printChanye = [&]() -> void {
                 std::cout << u8"产业: " << std::quoted(chanyeVec[currentChanyeIndex].name)
-                          << u8" 总产值: " << bestChanyeFinalOutputVec[currentChanyeIndex].output
+                          << u8" 总产值: "
+                          << FormatFloatToInt<std::uint64_t>(
+                                 bestChanyeFinalOutputVec[currentChanyeIndex].output)
                           << std::endl;
             };
 
@@ -765,7 +767,7 @@ struct ChanYeSelector : public SolutionSelectorBase
             }
             PrintLargeSpace();
         }
-        std::cout << "每轮收益:" << std::endl << bestChanyeProp.ToString();
+        std::cout << u8"每轮总收益:" << std::endl << bestChanyeProp.ToString();
         PrintLargeSpace();
 
         return true;

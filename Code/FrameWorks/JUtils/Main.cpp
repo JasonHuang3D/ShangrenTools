@@ -6,7 +6,7 @@
 
 #include "Main.h"
 
-#if defined(WIN32) && defined(M_DEBUG)
+#if defined(WIN32) && defined(_DEBUG)
 #define _CRTDBG_MAP_ALLOC
 #include <crtdbg.h>
 #endif // (WIN32) && defined (M_DEBUG)
