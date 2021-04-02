@@ -763,7 +763,7 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
                     const auto _refMinExeedSum = refMinExeedSum;
                     auto endCombIndex =
                         std::upper_bound(currentCombVec.begin(), currentCombVec.end(), prevExeed,
-                            [=](float prevSum, const Algorithms::OutputCombination& comb) -> bool {
+                            [&](float prevSum, const Algorithms::OutputCombination& comb) -> bool {
                                 return comb.diff + prevSum > _refMinExeedSum;
                             }) -
                         currentCombVec.begin();

@@ -76,6 +76,15 @@ std::vector<T> TockenizeString(const T& str, const T& delimiters)
     return v;
 }
 
+// Remove the Byte Order Mark from string if there is any.
+inline void RemoveBomFromString(std::string& x)
+{
+    if (x.size() < 3)
+        return;
+    if (x[0] == '\xEF' && x[1] == '\xBB' && x[2] == '\xBF')
+        x.erase(0, 3);
+}
+
 template <std::streamsize Precision = 2, std::uint8_t NumDigitsToGroup = 4, typename TypeValue,
     typename TypeExpected = TypeValue, typename = std::enable_if_t<std::is_arithmetic_v<TypeValue>>>
 std::string FormatNumber(TypeValue value)

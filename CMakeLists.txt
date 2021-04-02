@@ -11,6 +11,9 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+set(DEBUG_CONFIGURATIONS DEBUG CACHE INTERNAL "Debug configurations")
+set(RELEASE_CONFIGURATIONS RELEASE RELWITHDEBINFO MINSIZEREL CACHE INTERNAL "Release configurations")
+
 #====================build_settings INTERFACE======================================#
 # Add a interface library as build settings for all general targets
 # All settings will be grouped into build-settings to avoid messing around with global settings

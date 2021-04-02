@@ -38,6 +38,9 @@ bool UserDataList::ReadFromFile(
         std::uint64_t currentLineNum = 1;
         while (std::getline(fileStream, line))
         {
+            // Remove Bom if any
+            RemoveBomFromString(line);
+
             // Skip empty line or commented line
             if (line.empty() || line[0] == '#')
             {
