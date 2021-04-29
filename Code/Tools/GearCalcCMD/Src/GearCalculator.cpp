@@ -7,6 +7,7 @@
 #include "GearCalculator.h"
 
 #include "JUtils/Utils.h"
+#include "JUtils/Algorithms.h"
 
 #include <execution>
 #include <mutex>

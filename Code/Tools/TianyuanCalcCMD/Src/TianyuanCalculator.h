@@ -7,12 +7,6 @@
 
 #include <string>
 
-// This should not be greater than 64, as it is the max bits we can use. Otherwise by using
-// std::bitset produces a lot of overheads.
-#ifndef MAX_INPUT_SIZE
-#define MAX_INPUT_SIZE 64
-#endif // !MAX_COMBO_SIZE_BITS
-
 // This is used for max combination size of each calculation. 32 means 2 ^ 32 combinations is
 // allowed in memory.
 #ifndef MAX_COMB_NUM_BIT

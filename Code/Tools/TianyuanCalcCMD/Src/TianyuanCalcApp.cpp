@@ -11,9 +11,6 @@
 #include "TianyuanUserData.h"
 
 #define MAX_FRACTION_DIGITS_TO_PRINT 2
-
-#define MAX_INPUT_SIZE 64
-#define MAX_COMB_NUM_BIT 32
 #include "TianyuanCalculator.h"
 
 #include <iomanip>

@@ -48,16 +48,30 @@ bool UserDataList::ReadFromFile(
                 continue;
             }
 
-            // Splite line by "," or ";" or " "
-            auto args = TockenizeString<std::string>(line, ",; ");
+            // Split line by "," or ";" or " "
+            auto args           = TockenizeString<std::string>(line, ",;\t ");
+            const auto argsSize = args.size();
 
             // Make sure we have desc and data
-            if (args.size() == 2)
+            if (argsSize >= 2)
             {
-                auto desc  = args[0].c_str();
-                auto fData = std::stof(args[1]) * outList.m_unitScale;
-                auto data  = static_cast<std::uint64_t>(fData);
+                std::uint32_t argIndex = 0;
 
+                auto desc  = args[argIndex++].c_str();
+                auto fData = std::stod(args[argIndex++]) * outList.m_unitScale;
+
+                // Parse Amplifier
+                if (argsSize > 3)
+                {
+                    auto amplifierKey = args[argIndex++];
+                    if (amplifierKey == u8"增幅百分比")
+                    {
+                        auto amplifierValue = std::stod(args[argIndex++]);
+                        fData += (fData * amplifierValue) * 0.01;
+                    }
+                }
+
+                auto data = static_cast<std::uint64_t>(fData);
                 list.emplace_back(desc, data);
             }
             else
@@ -72,8 +86,7 @@ bool UserDataList::ReadFromFile(
 
         if (list.empty())
         {
-            errorStr +=
-                FormatString(u8"文件: ", fileName, u8" 没有解析到任何有效条目数!\n");
+            errorStr += FormatString(u8"文件: ", fileName, u8" 没有解析到任何有效条目数!\n");
             return false;
         }
 
@@ -82,8 +95,7 @@ bool UserDataList::ReadFromFile(
     }
     else
     {
-        errorStr +=
-           FormatString(u8"文件: ", fileName, u8" 无法打开，请检查文件名和路径!\n");
+        errorStr += FormatString(u8"文件: ", fileName, u8" 无法打开，请检查文件名和路径!\n");
         return false;
     }
 }
