@@ -75,6 +75,11 @@ private:
             m_calcSolution = Calculator::Solution::OverallBest;
             return AppState::Running;
         }
+        case 'x':
+        {
+            m_calcSolution = Calculator::Solution::UnorderedTarget;
+            return AppState::Running;
+        }
         case 'q':
             return AppState::Exit;
         case 'c':

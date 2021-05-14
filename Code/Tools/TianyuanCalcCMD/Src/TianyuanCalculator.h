@@ -24,6 +24,7 @@ public:
         None = 0,
         BestOfEachTarget,
         OverallBest,
+        UnorderedTarget,
 
         Test
     };

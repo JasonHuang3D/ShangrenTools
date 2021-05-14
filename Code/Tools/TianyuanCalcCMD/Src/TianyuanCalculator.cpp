@@ -341,7 +341,6 @@ bool SolutionBestOverral(const std::vector<const UserData*>& inputVec,
             [](const UserData* element) { return element->GetFixedData(); });
 
         auto taskFunc = [&](std::uint32_t targetIndex) {
-
             // Init input desc
             Combination::InputSumToTargetDesc<std::uint64_t> inputDesc(rawInputVec,
                 targetVec[targetIndex]->GetOriginalData(), resultList.m_unitScale, nullptr,
@@ -688,6 +687,13 @@ bool Calculator::Run(ResultDataList& resultList, std::string& errorStr, Solution
         return Solutions::SolutionBestOfEachTarget(inputVec, targetVec, resultList, errorStr);
     case Solution::OverallBest:
         return Solutions::SolutionBestOverral(inputVec, targetVec, resultList, errorStr);
+    case Solution::UnorderedTarget:
+    {
+        // Sort by ascending order.
+        std::sort(std::execution::par_unseq, targetVec.begin(), targetVec.end(),
+            [&](const UserData* a, const UserData* b) -> bool { return *a < *b; });
+        return Solutions::SolutionBestOverral(inputVec, targetVec, resultList, errorStr);
+    }
     case Solution::Test:
     {
         return true;
