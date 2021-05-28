@@ -6,8 +6,8 @@
 
 #include "GearCalculator.h"
 
-#include "JUtils/Utils.h"
 #include "JUtils/Algorithms.h"
+#include "JUtils/Utils.h"
 
 #include <execution>
 #include <mutex>
@@ -103,8 +103,8 @@ std::vector<ChanyePropBuff> GetChanyeStaicBuffVec(
     static constexpr auto kChanyePropMask = ChanyeFieldCatToMask<ChanyeCat>();
 
     // Init global buff
-    ChanyePropBuff xianJie_chanye_Buff;
-    GetSumOfXianjieChanyeBuffs<kChanyePropMask>(xianJieFileData, xianJie_chanye_Buff);
+    ChanyePropBuff xianJie_chanye_buff;
+    GetSumOfXianjieChanyeBuffs<kChanyePropMask>(xianJieFileData, xianJie_chanye_buff);
 
     std::vector<ChanyePropBuff> out(chanyeFiledSize);
 
@@ -119,7 +119,7 @@ std::vector<ChanyePropBuff> GetChanyeStaicBuffVec(
             chanyePropBuff.chanNeng_percent = chanyeFieldDataVec[i].selfBuff;
 
         // Add global buffs to each one
-        chanyePropBuff.IncreaseBy<kChanyePropMask>(xianJie_chanye_Buff);
+        chanyePropBuff.IncreaseBy<kChanyePropMask>(xianJie_chanye_buff);
     }
 
     return out;
@@ -383,11 +383,23 @@ public:
 
         PrintLargeSpace();
 
-        std::cout << u8"仙器属性总和:" << std::endl;
+        // Get xian jie static buffs
+        XianRenPropBuff xianJie_individual_buff;
+        GameAlgorithms::GetSumOfXianjieIndividualBuffs<kXianRenPropMask>(
+            m_xianJieFileData, xianJie_individual_buff);
+        XianRenPropBuff xianJie_global_buff;
+        GameAlgorithms::GetSumOfXianjieGlobalBuffs<kXianRenPropMask>(
+            m_xianJieFileData, xianJie_global_buff);
+
+        // Add static buffs with xianqi buffs
+        xianJie_individual_buff.IncreaseBy(xianQi_individual_buff_sum);
+        xianJie_global_buff.IncreaseBy(xianQi_global_buff_sum);
+
+        std::cout << u8"仙界属性总和:" << std::endl;
         PrintSmallSpace();
-        std::cout << xianQi_individual_buff_sum.ToString(XianRenPropBuff::k_individual_prefix);
+        std::cout << xianJie_individual_buff.ToString(XianRenPropBuff::k_individual_prefix);
         PrintSmallSpace();
-        std::cout << xianQi_global_buff_sum.ToString(XianRenPropBuff::k_global_prefix);
+        std::cout << xianJie_global_buff.ToString(XianRenPropBuff::k_global_prefix);
 
         PrintLargeSpace();
 
@@ -722,11 +734,23 @@ struct ChanYeSelector : public SolutionSelectorBase
 
         PrintSmallSpace();
 
-        std::cout << u8"仙器属性总和:" << std::endl;
+        // Get xian jie static buffs
+        XianRenPropBuff xianJie_individual_buff;
+        GameAlgorithms::GetSumOfXianjieIndividualBuffs<kXianRenPropMask>(
+            m_xianJieFileData, xianJie_individual_buff);
+        ChanyePropBuff xianJie_chanye_buff;
+        GameAlgorithms::GetSumOfXianjieChanyeBuffs<kChanyePropMask>(
+            m_xianJieFileData, xianJie_chanye_buff);
+
+        // Add static buffs with xianqi buffs
+        xianJie_individual_buff.IncreaseBy(xianQi_individual_buff_sum);
+        xianJie_chanye_buff.IncreaseBy(xianQi_chanye_buff_sum);
+
+        std::cout << u8"仙界属性总和:" << std::endl;
         PrintSmallSpace();
-        std::cout << xianQi_individual_buff_sum.ToString(XianRenPropBuff::k_individual_prefix);
+        std::cout << xianJie_individual_buff.ToString(XianRenPropBuff::k_individual_prefix);
         PrintSmallSpace();
-        std::cout << xianQi_chanye_buff_sum.ToString() << std::endl;
+        std::cout << xianJie_chanye_buff.ToString() << std::endl;
 
         PrintLargeSpace();
 

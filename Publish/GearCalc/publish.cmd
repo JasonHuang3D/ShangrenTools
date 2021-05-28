@@ -10,7 +10,7 @@ set target_name=GearCalcCMD
 set build_folder=build
 set build_mode=Release
 set dest_folder=%~dp0bin\
-set dest_name=仙界模拟器beta1.2.2.zip
+set dest_name=仙界模拟器beta1.2.3.zip
 set intro_file="README.txt"
 set additional_files=(XianjieData.json XianqiData.json)
 
