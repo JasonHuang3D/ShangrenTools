@@ -376,8 +376,8 @@ public:
         XianRenPropBuff xianQi_global_buff_sum;
         for (const auto* pGear : selectedGears)
         {
-            xianQi_individual_buff_sum.IncreaseBy(pGear->individualBuff);
-            xianQi_global_buff_sum.IncreaseBy(pGear->globalBuff);
+            xianQi_individual_buff_sum.IncreaseBy<kXianRenPropMask>(pGear->individualBuff);
+            xianQi_global_buff_sum.IncreaseBy<kXianRenPropMask>(pGear->globalBuff);
             std::cout << pGear->name << std::endl;
         }
 
